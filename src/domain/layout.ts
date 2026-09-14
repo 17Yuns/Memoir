@@ -14,12 +14,14 @@ export type WorkspaceLayoutState = {
   sidebarWidth: number;
   libraryWidth: number;
   editorSplit: number;
+  libraryCollapsed?: boolean;
 };
 
 export const DEFAULT_WORKSPACE_LAYOUT: WorkspaceLayoutState = {
   sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
   libraryWidth: DEFAULT_LIBRARY_WIDTH,
   editorSplit: DEFAULT_EDITOR_SPLIT,
+  libraryCollapsed: false,
 };
 
 function clampInteger(value: unknown, min: number, max: number, fallback: number) {
@@ -48,6 +50,7 @@ export function mergeLayout(layout?: Partial<WorkspaceLayoutState> | null): Work
     sidebarWidth: clampSidebarWidth(layout?.sidebarWidth),
     libraryWidth: clampLibraryWidth(layout?.libraryWidth),
     editorSplit: clampEditorSplit(layout?.editorSplit),
+    libraryCollapsed: layout?.libraryCollapsed === true,
   };
 }
 
@@ -55,15 +58,17 @@ export function fitLayoutColumns({
   sidebarWidth,
   libraryWidth,
   collapsed,
+  libraryCollapsed = false,
   containerWidth,
 }: {
   sidebarWidth: number;
   libraryWidth: number;
   collapsed: boolean;
+  libraryCollapsed?: boolean;
   containerWidth: number;
 }): { sidebar: number; library: number } {
   let sidebar = collapsed ? COLLAPSED_SIDEBAR_WIDTH : clampSidebarWidth(sidebarWidth);
-  let library = clampLibraryWidth(libraryWidth);
+  let library = libraryCollapsed ? 0 : clampLibraryWidth(libraryWidth);
   if (containerWidth <= 0) return { sidebar, library };
 
   const libraryBudget = containerWidth - sidebar - MIN_EDITOR_WIDTH;

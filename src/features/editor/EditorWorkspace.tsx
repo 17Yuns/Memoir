@@ -9,6 +9,7 @@ import {
   ExternalLink,
   FileDown,
   FileCode2,
+  Focus,
   Heading1,
   Heading2,
   Heading3,
@@ -120,6 +121,7 @@ export const EditorWorkspace = forwardRef<EditorHandle, {
   } | null>(null);
   const workspaceRoot = useAppStore((state) => state.workspaceRoot);
   const isSidebarCollapsed = useAppStore((state) => state.isSidebarCollapsed);
+  const libraryCollapsed = useAppStore((state) => state.layout.libraryCollapsed);
   const notes = useAppStore((state) => state.notes);
   const activePath = useAppStore((state) => state.activePath);
   const loadedContentPath = useAppStore((state) => state.loadedContentPath);
@@ -545,6 +547,15 @@ export const EditorWorkspace = forwardRef<EditorHandle, {
             ]}
             value={viewMode}
           />
+          <IconButton
+            active={Boolean(libraryCollapsed)}
+            aria-controls="library-panel"
+            label={t(libraryCollapsed ? "layout.exitFocus" : "layout.enterFocus")}
+            onClick={() => setLayout({ libraryCollapsed: !libraryCollapsed })}
+            style={editorStyles.mobileHidden}
+          >
+            <Focus {...stylex.props(editorStyles.icon)} />
+          </IconButton>
           <IconButton active={activeNote?.favorite} label={t("editor.favorite")} onClick={() => void toggleFavorite()}>
             <Star {...stylex.props(editorStyles.favoriteIcon, activeNote?.favorite && editorStyles.favoriteIconActive)} />
           </IconButton>

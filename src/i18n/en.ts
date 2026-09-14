@@ -25,6 +25,8 @@ export const en = {
   "app.closeDrawer": "Close sidebar drawer",
 
   "layout.resizeSidebar": "Resize navigation",
+  "layout.enterFocus": "Focus writing",
+  "layout.exitFocus": "Exit focus",
   "layout.resizeLibrary": "Resize notes list",
   "layout.resizeEditor": "Resize editor",
 

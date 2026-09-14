@@ -1072,6 +1072,7 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
       }),
       ...createLibrarySlice({
         set,
+        revealLibrary: () => get().setLayout({ libraryCollapsed: false }),
         scheduleQuery: libraryQuery.schedule,
         runQueryNow: () => {
           libraryQuery.runNow();

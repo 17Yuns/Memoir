@@ -35,11 +35,13 @@ describe("workspace layout", () => {
       sidebarWidth: DEFAULT_SIDEBAR_WIDTH,
       libraryWidth: DEFAULT_LIBRARY_WIDTH,
       editorSplit: DEFAULT_EDITOR_SPLIT,
+      libraryCollapsed: false,
     });
     expect(mergeLayout({ sidebarWidth: 200, libraryWidth: 40, editorSplit: 0.6 })).toEqual({
       sidebarWidth: 200,
       libraryWidth: MIN_LIBRARY_WIDTH,
       editorSplit: 0.6,
+      libraryCollapsed: false,
     });
   });
 
@@ -63,6 +65,16 @@ describe("workspace layout", () => {
     });
     expect(fitted.sidebar).toBe(200);
     expect(fitted.library).toBe(MIN_LIBRARY_WIDTH);
+  });
+
+  it("reclaims the hidden library column even in a narrow window", () => {
+    expect(fitLayoutColumns({
+      sidebarWidth: 200,
+      libraryWidth: 400,
+      collapsed: false,
+      libraryCollapsed: true,
+      containerWidth: 600,
+    })).toEqual({ sidebar: 200, library: 0 });
   });
 
   it("uses the collapsed rail width", () => {

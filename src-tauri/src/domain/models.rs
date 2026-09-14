@@ -489,6 +489,8 @@ pub struct WorkspaceLayout {
     pub sidebar_width: u32,
     #[serde(default = "default_library_width")]
     pub library_width: u32,
+    #[serde(default)]
+    pub library_collapsed: bool,
     #[serde(default = "default_editor_split")]
     pub editor_split: f32,
 }
@@ -517,6 +519,7 @@ impl Default for WorkspaceLayout {
         Self {
             sidebar_width: default_sidebar_width(),
             library_width: default_library_width(),
+            library_collapsed: false,
             editor_split: default_editor_split(),
         }
     }
@@ -532,6 +535,7 @@ impl WorkspaceLayout {
                 .library_width
                 .clamp(MIN_LIBRARY_WIDTH, MAX_LIBRARY_WIDTH),
             editor_split: sanitize_editor_split(self.editor_split),
+            library_collapsed: self.library_collapsed,
         }
     }
 }

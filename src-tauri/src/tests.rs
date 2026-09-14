@@ -385,12 +385,14 @@ fn layout_widths_persist_and_clamp() {
             Some(crate::domain::WorkspaceLayout {
                 sidebar_width: 220,
                 library_width: 360,
+                library_collapsed: true,
                 editor_split: 0.4,
             }),
         )
         .unwrap();
     assert_eq!(saved.layout.sidebar_width, 220);
     assert_eq!(saved.layout.library_width, 360);
+    assert!(saved.layout.library_collapsed);
     assert!((saved.layout.editor_split - 0.4).abs() < f32::EPSILON);
 
     let clamped = service
@@ -401,6 +403,7 @@ fn layout_widths_persist_and_clamp() {
             Some(crate::domain::WorkspaceLayout {
                 sidebar_width: 12,
                 library_width: 9_000,
+                library_collapsed: true,
                 editor_split: 8.0,
             }),
         )
@@ -414,6 +417,7 @@ fn layout_widths_persist_and_clamp() {
         .unwrap();
     assert_eq!(kept.layout.sidebar_width, 148);
     assert_eq!(kept.layout.library_width, 520);
+    assert!(kept.layout.library_collapsed);
 }
 
 #[test]

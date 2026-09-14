@@ -169,15 +169,16 @@ describe("app store actions", () => {
     expect(gateways.persistence.state.folderAppearances["/workspace"]).toBeUndefined();
   });
 
-  it("persists layout widths with preferences", async () => {
+  it("persists and restores a hidden library without losing its width", async () => {
     const gateways = createMockGateways();
     const store = createAppStore(gateways);
     await store.getState().initialize();
-    store.getState().setLayout({ sidebarWidth: 200, libraryWidth: 320, editorSplit: 0.4 });
+    store.getState().setLayout({ sidebarWidth: 200, libraryWidth: 320, editorSplit: 0.4, libraryCollapsed: true });
     expect(store.getState().layout).toEqual({
       sidebarWidth: 200,
       libraryWidth: 320,
       editorSplit: 0.4,
+      libraryCollapsed: true,
     });
     vi.advanceTimersByTime(400);
     await Promise.resolve();
@@ -185,7 +186,17 @@ describe("app store actions", () => {
       sidebarWidth: 200,
       libraryWidth: 320,
       editorSplit: 0.4,
+      libraryCollapsed: true,
     });
+    const restored = createAppStore(gateways);
+    await restored.getState().initialize();
+    expect(restored.getState().layout.libraryCollapsed).toBe(true);
+    restored.getState().setScopedFilter({ type: "folder", value: "work" });
+    expect(restored.getState().layout.libraryCollapsed).toBe(false);
+    expect(restored.getState().layout.libraryWidth).toBe(320);
+    restored.getState().setLayout({ libraryCollapsed: true });
+    restored.getState().setLibraryPanelMode("attachments");
+    expect(restored.getState().layout.libraryCollapsed).toBe(false);
   });
 
   it("renames, favorites and deletes a note that is not active", async () => {

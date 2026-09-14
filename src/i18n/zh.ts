@@ -22,6 +22,8 @@ export const zh = {
   "app.closeDrawer": "关闭侧边抽屉",
 
   "layout.resizeSidebar": "调整导航栏宽度",
+  "layout.enterFocus": "专注书写",
+  "layout.exitFocus": "退出专注",
   "layout.resizeLibrary": "调整笔记列表宽度",
   "layout.resizeEditor": "调整编辑区宽度",
 

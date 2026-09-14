@@ -189,6 +189,47 @@ describe("AppShell window chrome", () => {
 });
 
 describe("AppShell layout resize", () => {
+  it.each([false, true])("toggles focus independently with navigation collapsed=%s", async (isSidebarCollapsed) => {
+    setGatewaysForTests(createMockGateways());
+    const initialize = useAppStore.getState().initialize;
+    useAppStore.setState({
+      initialize: async () => undefined,
+      initialized: true,
+      workspaceRoot: "/workspace",
+      libraryPanelMode: "outline",
+      isSidebarCollapsed,
+      layout: { ...DEFAULT_WORKSPACE_LAYOUT, libraryWidth: 330 },
+    });
+    try {
+      const user = userEvent.setup();
+      const view = render(<AppShell />);
+      const focus = await view.findByRole("button", { name: /专注书写|focus writing/i });
+      const editor = view.container.querySelector("[data-editor-workspace]");
+      expect(editor).toContainElement(focus);
+      await user.click(focus);
+      expect(focus).toHaveAttribute("aria-pressed", "true");
+      expect(useAppStore.getState().isSidebarCollapsed).toBe(isSidebarCollapsed);
+      expect(useAppStore.getState().layout.libraryCollapsed).toBe(true);
+      expect(view.queryByRole("separator", { name: /调整笔记列表宽度|resize notes/i })).toBeNull();
+
+      const navigation = view.getByRole("button", {
+        name: isSidebarCollapsed ? /展开导航|expand navigation/i : /收起导航|collapse navigation/i,
+      });
+      await user.click(navigation);
+      expect(useAppStore.getState().isSidebarCollapsed).toBe(!isSidebarCollapsed);
+      expect(useAppStore.getState().layout.libraryCollapsed).toBe(true);
+
+      await user.click(view.getByRole("button", { name: /退出专注|exit focus/i }));
+      expect(focus).toHaveAttribute("aria-pressed", "false");
+      expect(useAppStore.getState().isSidebarCollapsed).toBe(!isSidebarCollapsed);
+      expect(view.getByRole("separator", { name: /调整笔记列表宽度|resize notes/i })).toHaveAttribute("aria-valuenow", "330");
+      expect(useAppStore.getState().libraryPanelMode).toBe("outline");
+      expect(view.container.querySelector("[data-editor-workspace]")).toBe(editor);
+    } finally {
+      useAppStore.setState({ initialize, isSidebarCollapsed: false });
+    }
+  });
+
   it("lets the user drag the navigation and notes splitters", async () => {
     const user = userEvent.setup();
     const view = render(<AppShell />);

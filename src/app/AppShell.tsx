@@ -103,6 +103,7 @@ function WorkspaceLayout({
     sidebarWidth: layout.sidebarWidth,
     libraryWidth: layout.libraryWidth,
     collapsed: isSidebarCollapsed,
+    libraryCollapsed: layout.libraryCollapsed,
     containerWidth,
   });
   const sidebarDragMax =
@@ -263,8 +264,10 @@ function WorkspaceLayout({
           )}
         </div>
         <div
+          id="library-panel"
           {...stylex.props(
             styles.panelSlot,
+            layout.libraryCollapsed && styles.libraryPanelCollapsed,
             mobilePanel === "library" && styles.mobilePanelActive,
           )}
         >
@@ -279,14 +282,16 @@ function WorkspaceLayout({
             onInsertAttachment={(markdown) => editorRef.current?.insertText(markdown)}
             onRename={openRename}
           />
-          <LayoutResizeHandle
-            defaultValue={DEFAULT_LIBRARY_WIDTH}
-            label={t("layout.resizeLibrary")}
-            max={libraryDragMax}
-            min={Math.min(MIN_LIBRARY_WIDTH, columns.library)}
-            onChange={(libraryWidth) => setLayout({ libraryWidth })}
-            value={columns.library}
-          />
+          {!layout.libraryCollapsed && (
+            <LayoutResizeHandle
+              defaultValue={DEFAULT_LIBRARY_WIDTH}
+              label={t("layout.resizeLibrary")}
+              max={libraryDragMax}
+              min={Math.min(MIN_LIBRARY_WIDTH, columns.library)}
+              onChange={(libraryWidth) => setLayout({ libraryWidth })}
+              value={columns.library}
+            />
+          )}
         </div>
         <Suspense
           fallback={
@@ -665,6 +670,10 @@ const styles = stylex.create({
     boxShadow: {
       [media.mobile]: "0 25px 50px -12px rgb(0 0 0 / 25%)",
     },
+  },
+  libraryPanelCollapsed: {
+    visibility: { default: "hidden", [media.mobile]: "visible" },
+    overflow: { default: "hidden", [media.mobile]: "visible" },
   },
   mobilePanelActive: {
     display: {

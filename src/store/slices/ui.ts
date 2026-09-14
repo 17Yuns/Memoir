@@ -19,6 +19,7 @@ type UiSliceContext = {
 export function createUiSlice({ set, get, persistPreferences, onSettingsChanged }: UiSliceContext) {
   return {
     setLibraryPanelMode(libraryPanelMode: LibraryPanelMode) {
+      get().setLayout({ libraryCollapsed: false });
       set({
         libraryPanelMode,
         mobilePanel: libraryPanelMode === "graph" ? "editor" : "library",
@@ -52,7 +53,8 @@ export function createUiSlice({ set, get, persistPreferences, onSettingsChanged 
       if (
         layout.sidebarWidth === current.sidebarWidth &&
         layout.libraryWidth === current.libraryWidth &&
-        layout.editorSplit === current.editorSplit
+        layout.editorSplit === current.editorSplit &&
+        layout.libraryCollapsed === current.libraryCollapsed
       ) {
         return;
       }

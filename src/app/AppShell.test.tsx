@@ -43,6 +43,7 @@ afterEach(() => {
     attachments: [],
     libraryPanelMode: "notes",
     layout: DEFAULT_WORKSPACE_LAYOUT,
+    isSidebarCollapsed: false,
     settings: DEFAULT_SETTINGS,
   });
 });
@@ -91,6 +92,7 @@ describe("AppShell AI navigation", () => {
         "正在处理整篇笔记",
       );
     } finally {
+      cleanup();
       useAppStore.setState({ initialize });
     }
   });
@@ -157,6 +159,7 @@ describe("AppShell window chrome", () => {
       expect(view.getByRole("button", { name: /打开文件夹|open folder/i })).toBeInTheDocument();
       expect(document.querySelector("[data-window-drag-bar]")).toBeTruthy();
     } finally {
+      cleanup();
       useAppStore.setState({ initialize });
     }
   });
@@ -183,6 +186,7 @@ describe("AppShell window chrome", () => {
         close.parentElement,
       );
     } finally {
+      cleanup();
       useAppStore.setState({ initialize });
     }
   });
@@ -234,35 +238,40 @@ describe("AppShell layout resize", () => {
       expect(useAppStore.getState().libraryPanelMode).toBe("outline");
       expect(view.container.querySelector("[data-editor-workspace]")).toBe(editor);
     } finally {
+      cleanup();
       useAppStore.setState({ initialize, isSidebarCollapsed: false });
     }
   });
 
   it("lets the user drag the navigation and notes splitters", async () => {
-    const user = userEvent.setup();
-    const view = render(<AppShell />);
-
-    await waitFor(() => {
-      expect(
-        view.queryByRole("button", { name: /load demo notes|载入演示文档/i }) ||
-          view.queryByRole("separator", { name: /调整导航栏宽度|resize navigation/i }),
-      ).toBeTruthy();
+    const initialize = useAppStore.getState().initialize;
+    setGatewaysForTests(createMockGateways());
+    useAppStore.setState({
+      initialize: async () => undefined,
+      initialized: true,
+      workspaceRoot: "/workspace",
+      isSidebarCollapsed: false,
+      layout: DEFAULT_WORKSPACE_LAYOUT,
     });
-    const loadDemo = view.queryByRole("button", { name: /load demo notes|载入演示文档/i });
-    if (loadDemo) await user.click(loadDemo);
 
-    const sidebar = await view.findByRole("separator", {
-      name: /调整导航栏宽度|resize navigation/i,
-    });
-    dispatchPointer(sidebar, "pointerdown", DEFAULT_SIDEBAR_WIDTH);
-    dispatchPointer(sidebar, "pointermove", DEFAULT_SIDEBAR_WIDTH + 40);
-    dispatchPointer(sidebar, "pointerup", DEFAULT_SIDEBAR_WIDTH + 40);
-    expect(useAppStore.getState().layout.sidebarWidth).toBe(DEFAULT_SIDEBAR_WIDTH + 40);
+    try {
+      const view = render(<AppShell />);
+      const sidebar = await view.findByRole("separator", {
+        name: /调整导航栏宽度|resize navigation/i,
+      });
+      dispatchPointer(sidebar, "pointerdown", DEFAULT_SIDEBAR_WIDTH);
+      dispatchPointer(sidebar, "pointermove", DEFAULT_SIDEBAR_WIDTH + 40);
+      dispatchPointer(sidebar, "pointerup", DEFAULT_SIDEBAR_WIDTH + 40);
+      expect(useAppStore.getState().layout.sidebarWidth).toBe(DEFAULT_SIDEBAR_WIDTH + 40);
 
-    const library = view.getByRole("separator", { name: /调整笔记列表宽度|resize notes/i });
-    dispatchPointer(library, "pointerdown", 280);
-    dispatchPointer(library, "pointermove", 330);
-    dispatchPointer(library, "pointerup", 330);
-    expect(useAppStore.getState().layout.libraryWidth).toBe(330);
+      const library = view.getByRole("separator", { name: /调整笔记列表宽度|resize notes/i });
+      dispatchPointer(library, "pointerdown", 280);
+      dispatchPointer(library, "pointermove", 330);
+      dispatchPointer(library, "pointerup", 330);
+      expect(useAppStore.getState().layout.libraryWidth).toBe(330);
+    } finally {
+      cleanup();
+      useAppStore.setState({ initialize });
+    }
   });
 });

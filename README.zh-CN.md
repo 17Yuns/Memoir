@@ -124,6 +124,8 @@ bun run build
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
+前端测试使用 Vitest，请运行 `bun run test`。`bun test` 会启动 Bun 原生测试运行器，跳过 Vite 配置中的 StyleX 编译和应用版本注入，导致测试加载失败。
+
 GitHub Actions 会在 pull request 和推送到 `main` 时跑同一套检查。安装包构建会等这些检查通过。
 
 ### 目录

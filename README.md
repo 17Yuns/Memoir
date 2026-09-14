@@ -124,6 +124,8 @@ bun run build
 cargo test --manifest-path src-tauri/Cargo.toml
 ```
 
+Frontend tests use Vitest: run `bun run test`. The `bun test` command starts Bun’s native test runner, bypassing the StyleX compilation and app version injection in the Vite configuration, so test modules fail to load.
+
 GitHub Actions runs the same checks on pull requests and pushes to `main`. Installer builds wait for them to pass.
 
 ### Layout

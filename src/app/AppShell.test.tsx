@@ -189,7 +189,12 @@ describe("AppShell window chrome", () => {
 });
 
 describe("AppShell layout resize", () => {
-  it.each([false, true])("toggles focus independently with navigation collapsed=%s", async (isSidebarCollapsed) => {
+  it.each([
+    { isSidebarCollapsed: false, expandDuringFocus: false },
+    { isSidebarCollapsed: true, expandDuringFocus: false },
+    { isSidebarCollapsed: false, expandDuringFocus: true },
+    { isSidebarCollapsed: true, expandDuringFocus: true },
+  ])("restores navigation after focus with collapsed=$isSidebarCollapsed and expandDuringFocus=$expandDuringFocus", async ({ isSidebarCollapsed, expandDuringFocus }) => {
     setGatewaysForTests(createMockGateways());
     const initialize = useAppStore.getState().initialize;
     useAppStore.setState({
@@ -208,20 +213,23 @@ describe("AppShell layout resize", () => {
       expect(editor).toContainElement(focus);
       await user.click(focus);
       expect(focus).toHaveAttribute("aria-pressed", "true");
-      expect(useAppStore.getState().isSidebarCollapsed).toBe(isSidebarCollapsed);
+      expect(useAppStore.getState().isSidebarCollapsed).toBe(true);
       expect(useAppStore.getState().layout.libraryCollapsed).toBe(true);
+      expect(view.queryByRole("separator", { name: /调整导航栏宽度|resize navigation/i })).toBeNull();
       expect(view.queryByRole("separator", { name: /调整笔记列表宽度|resize notes/i })).toBeNull();
 
-      const navigation = view.getByRole("button", {
-        name: isSidebarCollapsed ? /展开导航|expand navigation/i : /收起导航|collapse navigation/i,
-      });
-      await user.click(navigation);
-      expect(useAppStore.getState().isSidebarCollapsed).toBe(!isSidebarCollapsed);
-      expect(useAppStore.getState().layout.libraryCollapsed).toBe(true);
+      if (expandDuringFocus) {
+        await user.click(view.getByRole("button", { name: /展开导航|expand navigation/i }));
+        expect(useAppStore.getState().isSidebarCollapsed).toBe(false);
+        expect(useAppStore.getState().layout.libraryCollapsed).toBe(true);
+      }
 
       await user.click(view.getByRole("button", { name: /退出专注|exit focus/i }));
       expect(focus).toHaveAttribute("aria-pressed", "false");
-      expect(useAppStore.getState().isSidebarCollapsed).toBe(!isSidebarCollapsed);
+      expect(useAppStore.getState().isSidebarCollapsed).toBe(isSidebarCollapsed);
+      expect(view.getByRole("button", {
+        name: isSidebarCollapsed ? /展开导航|expand navigation/i : /收起导航|collapse navigation/i,
+      })).toBeInTheDocument();
       expect(view.getByRole("separator", { name: /调整笔记列表宽度|resize notes/i })).toHaveAttribute("aria-valuenow", "330");
       expect(useAppStore.getState().libraryPanelMode).toBe("outline");
       expect(view.container.querySelector("[data-editor-workspace]")).toBe(editor);

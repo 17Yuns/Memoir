@@ -63,7 +63,7 @@ export class MockWorkspaceGateway implements WorkspaceGateway {
   chatCalls: Array<{
     settings: AiSettings;
     messages: AiChatMessage[];
-    target: AiRewriteTarget;
+    target: AiRewriteTarget | null;
   }> = [];
 
   async chooseWorkspace(_title?: string) {
@@ -158,7 +158,7 @@ export class MockWorkspaceGateway implements WorkspaceGateway {
     _root: string,
     settings: AiSettings,
     messages: AiChatMessage[],
-    target: AiRewriteTarget,
+    target: AiRewriteTarget | null,
     onProgress?: (progress: AiChatProgress) => void,
   ) {
     onProgress?.({ stage: "callingModel", model: settings.chatModel });

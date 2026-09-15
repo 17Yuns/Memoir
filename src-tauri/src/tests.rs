@@ -16,6 +16,29 @@ use std::time::Duration;
 use tempfile::tempdir;
 
 #[test]
+fn shortcut_preferences_preserve_custom_and_disabled_bindings() {
+    let settings: AppSettings = serde_json::from_value(serde_json::json!({
+        "shortcuts": { "save": "Mod+Shift+KeyS", "newNote": null }
+    }))
+    .unwrap();
+    assert_eq!(settings.shortcuts.save.as_deref(), Some("Mod+Shift+KeyS"));
+    assert_eq!(settings.shortcuts.new_note, None);
+    assert_eq!(settings.shortcuts.zoom_in.as_deref(), Some("Mod+Equal"));
+    assert_eq!(
+        settings.shortcuts.toggle_focus.as_deref(),
+        Some("Mod+Shift+KeyF")
+    );
+    let serialized = serde_json::to_value(&settings).unwrap();
+    assert!(serialized["shortcuts"]["newNote"].is_null());
+    assert_eq!(
+        serde_json::from_value::<AppSettings>(serialized).unwrap(),
+        settings
+    );
+    let legacy: AppSettings = serde_json::from_str("{}").unwrap();
+    assert_eq!(legacy.shortcuts, AppSettings::default().shortcuts);
+}
+
+#[test]
 fn rejects_path_traversal_absolute_paths_and_unsupported_extensions() {
     assert_eq!(
         validate_relative_path("../outside.md").unwrap_err().code,

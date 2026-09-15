@@ -3,6 +3,7 @@ import {
   ArrowUp,
   Check,
   FileDiff,
+  FileText,
   LoaderCircle,
   Plus,
   RefreshCw,
@@ -60,6 +61,7 @@ export function AiRewritePanel({
 }) {
   const { t } = useI18n();
   const [contextTarget, setContextTarget] = useState(target);
+  const [includeContext, setIncludeContext] = useState(true);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [pendingEdit, setPendingEdit] = useState<AiEditorEdit | null>(null);
@@ -79,6 +81,7 @@ export function AiRewritePanel({
   useEffect(() => {
     requestIdRef.current += 1;
     setContextTarget(target);
+    setIncludeContext(true);
     setMessages([]);
     setDraft("");
     setPendingEdit(null);
@@ -141,7 +144,7 @@ export function AiRewritePanel({
     let reply = emptyReply();
     setLive(reply);
     followScrollRef.current = true;
-    const requestTarget = pendingEdit
+    const requestTarget = !includeContext ? null : pendingEdit
       ? {
           ...contextTarget,
           to: contextTarget.from + pendingEdit.replacement.length,
@@ -184,7 +187,7 @@ export function AiRewritePanel({
         ...conversation,
         { role: "assistant", content: response.message || t("aiRewrite.assistant"), reasoning: reply.reasoning, activity: reply.activity, elapsedMs: Date.now() - (startedAtRef.current ?? Date.now()) },
       ]);
-      if (response.edit && response.edit.replacement !== contextTarget.source) {
+      if (requestTarget && response.edit && response.edit.replacement !== contextTarget.source) {
         setPendingEdit({ ...contextTarget, replacement: response.edit.replacement });
       }
     } catch (requestError) {
@@ -279,7 +282,6 @@ export function AiRewritePanel({
         <AiPanelHeader
           onNewConversation={startNewConversation}
           onRefresh={refreshContext}
-          subtitle={t("aiRewrite.documentDescription")}
         />
         <div {...stylex.props(styles.empty)}>
           <Sparkles {...stylex.props(styles.emptyIcon)} />
@@ -290,11 +292,6 @@ export function AiRewritePanel({
     );
   }
 
-  const contextLabel =
-    contextTarget.scope === "selection"
-      ? t("aiRewrite.selectionDescription")
-      : t("aiRewrite.documentDescription");
-
   return (
     <aside
       aria-label={t("aiRewrite.title")}
@@ -304,24 +301,12 @@ export function AiRewritePanel({
       <AiPanelHeader
         onNewConversation={startNewConversation}
         onRefresh={refreshContext}
-        subtitle={contextLabel}
       />
 
       <div ref={scrollRef} onScroll={() => {
         const scroll = scrollRef.current;
         if (scroll) followScrollRef.current = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 64;
       }} {...stylex.props(styles.conversation)}>
-        <div {...stylex.props(styles.contextBar)}>
-          <span {...stylex.props(styles.contextScope)}>
-            {contextTarget.scope === "selection"
-              ? t("aiRewrite.selectionContext")
-              : t("aiRewrite.documentContext")}
-          </span>
-          <span title={contextTarget.path} {...stylex.props(styles.contextPath)}>
-            {contextTarget.path}
-          </span>
-        </div>
-
         {!messages.length && !loading && (
           <div {...stylex.props(styles.welcome)}>
             <Sparkles {...stylex.props(styles.welcomeIcon)} />
@@ -476,10 +461,25 @@ export function AiRewritePanel({
             {...stylex.props(styles.composerTextarea)}
           />
           <div {...stylex.props(styles.composerToolbar)}>
-            <span title={settings.chatModel} {...stylex.props(styles.composerModel)}>
-              <Sparkles aria-hidden="true" {...stylex.props(styles.composerModelIcon)} />
-              <span {...stylex.props(styles.composerModelName)}>{settings.chatModel}</span>
-            </span>
+            <Button
+              aria-label={t("aiRewrite.includeContext")}
+              aria-pressed={includeContext}
+              disabled={loading}
+              onClick={() => setIncludeContext((included) => !included)}
+              size="sm"
+              variant="ghost"
+              title={includeContext ? contextTarget.path : t("aiRewrite.includeContext")}
+              style={[styles.contextButton, includeContext && styles.contextButtonActive]}
+            >
+              <FileText aria-hidden="true" {...stylex.props(styles.buttonIcon)} />
+              {t("aiRewrite.context")}
+              <span {...stylex.props(styles.contextButtonLabel)}>
+                {includeContext
+                  ? t(contextTarget.scope === "selection" ? "aiRewrite.selectionContext" : "aiRewrite.currentDocument")
+                  : t("aiRewrite.noContext")}
+              </span>
+              {includeContext && <Check aria-hidden="true" {...stylex.props(styles.buttonIcon)} />}
+            </Button>
             <Button
               aria-label={loading ? t("aiRewrite.generating") : t("aiRewrite.generate")}
               disabled={loading || !draft.trim()}
@@ -572,11 +572,9 @@ function AiProgressStatus({
 }
 
 function AiPanelHeader({
-  subtitle,
   onNewConversation,
   onRefresh,
 }: {
-  subtitle: string;
   onNewConversation: () => void;
   onRefresh: () => void;
 }) {
@@ -607,7 +605,6 @@ function AiPanelHeader({
           <Sparkles {...stylex.props(styles.titleIcon)} />
           <h2 {...stylex.props(styles.title)}>{t("aiRewrite.title")}</h2>
         </div>
-        <p {...stylex.props(styles.scope)}>{subtitle}</p>
       </div>
     </PanelHeader>
   );
@@ -637,48 +634,10 @@ const styles = stylex.create({
   titleRow: { display: "flex", alignItems: "center", gap: "8px" },
   titleIcon: { width: "15px", height: "15px", color: accents.primary },
   title: { margin: 0, color: colors.text, fontSize: "14px", fontWeight: 700, letterSpacing: 0 },
-  scope: {
-    overflow: "hidden",
-    marginTop: "4px",
-    color: colors.muted,
-    fontSize: "11px",
-    lineHeight: 1.45,
-    letterSpacing: 0,
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
   headerActions: { display: "flex", flex: "none", gap: "1px" },
   headerButton: { width: "27px", height: "27px", borderRadius: "6px" },
   headerIcon: { width: "13px", height: "13px" },
   conversation: { minHeight: 0, overflowY: "auto", padding: "12px 14px 20px" },
-  contextBar: {
-    display: "flex",
-    minWidth: 0,
-    alignItems: "center",
-    gap: "8px",
-    marginBottom: "18px",
-    color: colors.muted,
-    fontSize: "10px",
-  },
-  contextScope: {
-    flex: "none",
-    padding: "2px 6px",
-    borderWidth: "1px",
-    borderStyle: "solid",
-    borderColor: colors.border,
-    borderRadius: "4px",
-    backgroundColor: colors.panel,
-    color: `color-mix(in srgb, ${colors.text} 74%, ${colors.muted})`,
-    fontWeight: 600,
-  },
-  contextPath: {
-    overflow: "hidden",
-    minWidth: 0,
-    direction: "rtl",
-    textAlign: "left",
-    textOverflow: "ellipsis",
-    whiteSpace: "nowrap",
-  },
   welcome: {
     display: "grid",
     justifyItems: "center",
@@ -931,17 +890,9 @@ const styles = stylex.create({
     gap: "8px",
     padding: "3px 5px 6px 10px",
   },
-  composerModel: {
-    display: "flex",
-    minWidth: 0,
-    alignItems: "center",
-    gap: "6px",
-    color: `color-mix(in srgb, ${colors.text} 72%, ${colors.muted})`,
-    fontSize: "10px",
-    fontWeight: 550,
-  },
-  composerModelIcon: { width: "13px", height: "13px", flex: "none", color: accents.primary },
-  composerModelName: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  contextButton: { minWidth: 0, paddingInline: "6px", fontSize: "10px", gap: "5px" },
+  contextButtonActive: { color: accents.primary },
+  contextButtonLabel: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   sendButton: { width: "30px", height: "30px", flex: "none", borderRadius: "7px" },
   sendIcon: { width: "15px", height: "15px" },
   buttonIcon: { width: "13px", height: "13px" },

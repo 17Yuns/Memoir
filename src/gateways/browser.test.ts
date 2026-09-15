@@ -186,6 +186,27 @@ describe("BrowserWorkspaceGateway", () => {
     fetchMock.mockRestore();
   });
 
+  it("omits editor context and suppresses edit proposals when no document is attached", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      Response.json({ choices: [{ message: { content: JSON.stringify({
+        message: "Hello",
+        edit: { tool: "replace_document", replacement: "Unexpected edit" },
+      }) } }] }),
+    );
+    const messages = [{ role: "user" as const, content: "Hello there" }];
+    const result = await new BrowserWorkspaceGateway().chatWithNote(
+      "demo://memoir", DEFAULT_SETTINGS.ai, messages, null,
+    );
+    const payload = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));
+    expect(payload.messages.filter((message: { role: string }) => message.role === "user")).toEqual(messages);
+    expect(JSON.stringify(payload)).not.toContain("<editor_context>");
+    expect(payload.messages).toContainEqual(expect.objectContaining({
+      role: "system", content: expect.stringContaining("No editor context is attached"),
+    }));
+    expect(result).toEqual({ message: "Hello", edit: null });
+    fetchMock.mockRestore();
+  });
+
   it.each(["```json\n", "```JSON\r\n", "```\n"])("holds a note conversation with a %s wrapper", async (fence) => {
     const gateway = new BrowserWorkspaceGateway();
     const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(

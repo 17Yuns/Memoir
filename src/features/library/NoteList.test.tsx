@@ -425,7 +425,7 @@ describe("NoteList", () => {
     );
 
     expect(view.getByRole("complementary", { name: "AI 助手" })).toHaveTextContent(
-      "正在处理整篇笔记",
+      "当前文档",
     );
     expect(view.queryByRole("button", { name: "笔记" })).not.toBeInTheDocument();
   });

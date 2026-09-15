@@ -9,6 +9,19 @@ function translated(store: ReturnType<typeof createAppStore>, key: "status.draft
 }
 
 describe("app store actions", () => {
+  it("persists custom shortcuts and restores them on initialization", async () => {
+    const gateways = createMockGateways();
+    const store = createAppStore(gateways);
+    const settings = store.getState().settings;
+    const shortcuts = { ...settings.shortcuts, save: "Mod+Shift+KeyS", newNote: null };
+    store.getState().setSettings({ ...settings, shortcuts });
+    vi.advanceTimersByTime(350);
+    await Promise.resolve();
+    expect(gateways.persistence.state.preferences.shortcuts).toEqual(shortcuts);
+    const restored = createAppStore(gateways);
+    await restored.getState().initialize();
+    expect(restored.getState().settings.shortcuts).toEqual(shortcuts);
+  });
   beforeEach(() => {
     vi.useFakeTimers();
   });

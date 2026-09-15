@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { clampUiScale, DEFAULT_SETTINGS, mergeSettings, type AppSettings } from "./settings";
 
 describe("settings merge", () => {
+  it("migrates old settings and preserves custom or disabled shortcuts", () => {
+    expect(mergeSettings({}).shortcuts).toEqual(DEFAULT_SETTINGS.shortcuts);
+    expect(mergeSettings({ shortcuts: { save: "Mod+Shift+KeyS", newNote: null } }).shortcuts)
+      .toEqual({ ...DEFAULT_SETTINGS.shortcuts, save: "Mod+Shift+KeyS", newNote: null });
+    expect(mergeSettings({ shortcuts: { save: "KeyS", newNote: "Mod+ControlLeft" } }).shortcuts)
+      .toEqual(DEFAULT_SETTINGS.shortcuts);
+  });
   it("defaults and clamps interface scale", () => {
     expect(mergeSettings(null).appearance.accent).toBe("ink");
     expect(mergeSettings(null).appearance.uiScale).toBe(1);

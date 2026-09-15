@@ -67,14 +67,14 @@ pub async fn chat_with_note(
     root: String,
     settings: AiSettings,
     messages: Vec<AiChatMessage>,
-    target: AiRewriteTarget,
+    target: Option<AiRewriteTarget>,
     request_id: String,
 ) -> Result<AiChatResponse, AppError> {
     let service = services.vector_index.clone();
     tauri::async_runtime::spawn_blocking(move || {
         crate::infrastructure::ai::ChatCompletionClient::new(&settings)?.chat(
             &messages,
-            &target,
+            target.as_ref(),
             |mut progress: AiChatProgress| {
                 progress.request_id = Some(request_id.clone());
                 let _ = app.emit(crate::domain::AI_CHAT_PROGRESS_EVENT, progress);

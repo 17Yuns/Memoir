@@ -8,6 +8,7 @@ import {
   EyeOff,
   Info,
   KeyRound,
+  Keyboard,
   MessageSquare,
   Palette,
   RotateCcw,
@@ -47,6 +48,7 @@ import { commonStyles } from "../../styles/tokens.stylex";
 import { UpdateCheckControls } from "../update/UpdateCheckControls";
 import { settingsStyles as styles } from "./settings-styles.stylex";
 import type { SettingsSection } from "./types";
+import { ShortcutSettings } from "./ShortcutSettings";
 
 export { GITHUB_REPO_URL };
 
@@ -657,6 +659,7 @@ export default function SettingsDialog({
     { value: "general", labelKey: "settings.general", icon: SlidersHorizontal },
     { value: "appearance", labelKey: "settings.appearance", icon: Palette },
     { value: "editor", labelKey: "settings.editor", icon: Type },
+    { value: "shortcuts", labelKey: "settings.shortcuts", icon: Keyboard },
     { value: "ai", labelKey: "settings.ai", icon: Sparkles },
     { value: "about", labelKey: "settings.about", icon: Info },
   ] as const satisfies ReadonlyArray<{
@@ -710,6 +713,9 @@ export default function SettingsDialog({
           )}
           {section === "editor" && (
             <EditorSettings key="editor" onChange={onSettingsChange} settings={settings} />
+          )}
+          {section === "shortcuts" && open && (
+            <ShortcutSettings key="shortcuts" onChange={onSettingsChange} settings={settings} />
           )}
           {section === "ai" && <AiSettings key="ai" onChange={onSettingsChange} settings={settings} />}
           {section === "about" && (

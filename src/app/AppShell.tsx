@@ -189,10 +189,12 @@ function WorkspaceLayout({
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      const action = globalShortcutAction(event);
+      if (event.target instanceof Element && event.target.closest('[data-shortcut-recording="true"]')) return;
+      const action = globalShortcutAction(event, useAppStore.getState().settings.shortcuts);
       if (!action) return;
 
       event.preventDefault();
+      event.stopPropagation();
       switch (action) {
         case "save":
           void saveActiveNote();
@@ -215,11 +217,14 @@ function WorkspaceLayout({
         case "toggleSidebar":
           setSidebarCollapsed(!useAppStore.getState().isSidebarCollapsed);
           break;
+        case "toggleFocus":
+          if (!event.repeat) useAppStore.getState().toggleFocus();
+          break;
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [openCreate, saveActiveNote, setSidebarCollapsed, setUiScale]);
 
   return (

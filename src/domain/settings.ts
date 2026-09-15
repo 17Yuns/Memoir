@@ -1,3 +1,5 @@
+import { DEFAULT_SHORTCUTS, mergeShortcuts, type ShortcutSettings } from "./shortcuts";
+
 export type ThemePreference = "system" | "light" | "dark";
 export type AccentColor = "ink" | "coral" | "blue" | "green" | "gold" | "violet" | "slate";
 export type BackgroundStyle = "paper" | "pure";
@@ -11,7 +13,7 @@ export type CloseBehavior = "tray" | "quit";
 export type NoteSortField = "name" | "modified" | "title";
 export type NoteSortDirection = "asc" | "desc";
 export type AiProvider = "openai" | "ollama" | "custom";
-export type SettingsSection = "general" | "appearance" | "editor" | "ai" | "about";
+export type SettingsSection = "general" | "appearance" | "editor" | "shortcuts" | "ai" | "about";
 
 export const MIN_UI_SCALE = 0.8;
 export const MAX_UI_SCALE = 2;
@@ -24,6 +26,7 @@ export const MAX_AI_EMBEDDING_MAX_LENGTH = 100_000;
 export const DEFAULT_AI_EMBEDDING_MAX_LENGTH = 1_800;
 
 export type AppSettings = {
+  shortcuts: ShortcutSettings;
   appearance: {
     locale: LocalePreference;
     theme: ThemePreference;
@@ -61,6 +64,7 @@ export type AppSettings = {
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  shortcuts: DEFAULT_SHORTCUTS,
   appearance: {
     locale: "system",
     theme: "system",
@@ -136,6 +140,7 @@ export function mergeSettings(
     editor?: Partial<AppSettings["editor"]>;
     general?: Partial<AppSettings["general"]>;
     ai?: Partial<AppSettings["ai"]>;
+    shortcuts?: Partial<ShortcutSettings>;
   } | null,
 ): AppSettings {
   const appearance = {
@@ -151,6 +156,7 @@ export function mergeSettings(
     ...settings?.ai,
   };
   return {
+    shortcuts: mergeShortcuts(settings?.shortcuts),
     appearance: {
       ...appearance,
       uiScale: clampUiScale(appearance.uiScale),

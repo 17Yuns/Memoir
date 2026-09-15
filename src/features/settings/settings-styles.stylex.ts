@@ -75,7 +75,7 @@ export const settingsStyles = stylex.create({
     display: "grid",
     gridTemplateColumns: {
       default: null,
-      [media.mobile]: "repeat(5, minmax(104px, 1fr))",
+      [media.mobile]: "repeat(6, minmax(104px, 1fr))",
     },
     gap: {
       default: "4px",
@@ -199,6 +199,32 @@ export const settingsStyles = stylex.create({
   },
   rowCopy: {
     minWidth: 0,
+  },
+  shortcutHint: {
+    color: colors.muted,
+    fontSize: "12px",
+    lineHeight: 1.7,
+    marginBlock: "18px 8px",
+  },
+  shortcutControls: {
+    display: "flex",
+    alignItems: "center",
+    gap: "6px",
+    flexWrap: "wrap",
+  },
+  shortcutBinding: {
+    minWidth: "160px",
+    fontVariantNumeric: "tabular-nums",
+  },
+  shortcutRecording: {
+    borderColor: accents.primary,
+    color: accents.primary,
+  },
+  shortcutError: {
+    color: colors.danger,
+    fontSize: "12px",
+    lineHeight: 1.5,
+    marginBlock: "6px 0",
   },
   rowLabel: {
     color: colors.text,

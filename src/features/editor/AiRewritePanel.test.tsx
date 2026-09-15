@@ -50,6 +50,39 @@ describe("AiRewritePanel", () => {
     ]);
   });
 
+  it("toggles document context for requests and ignores edits without context", async () => {
+    const gateways = createMockGateways();
+    gateways.workspace.chatResult = {
+      message: "回答",
+      edit: { tool: "replace_document", replacement: "不应应用的修改" },
+    };
+    setGatewaysForTests(gateways);
+    const user = userEvent.setup();
+    const view = render(
+      <AiRewritePanel onApply={() => true} onClose={() => undefined}
+        onRefreshTarget={() => target} onSave={async () => true} workspaceRoot="/workspace"
+        settings={{ ...DEFAULT_SETTINGS.ai, enabled: true }} target={target} />,
+    );
+    const context = view.getByRole("button", { name: "将当前文档加入上下文" });
+    expect(context).toHaveAttribute("aria-pressed", "true");
+    expect(view.queryByText(DEFAULT_SETTINGS.ai.chatModel)).not.toBeInTheDocument();
+    expect(view.queryByText("正在处理整篇笔记")).not.toBeInTheDocument();
+    expect(view.queryByText(target.path)).not.toBeInTheDocument();
+
+    await user.click(context);
+    expect(context).toHaveAttribute("aria-pressed", "false");
+    expect(context).toHaveTextContent("未添加");
+    await user.type(view.getByRole("textbox"), "你好{enter}");
+    await view.findByText("回答");
+    expect(gateways.workspace.chatCalls[0].target).toBeNull();
+    expect(view.queryByRole("region", { name: "建议修改" })).not.toBeInTheDocument();
+
+    await user.click(context);
+    await user.type(view.getByRole("textbox"), "润色{enter}");
+    await view.findByRole("region", { name: "建议修改" });
+    expect(gateways.workspace.chatCalls[1].target).toEqual(target);
+  });
+
   it("does not send when Enter confirms an IME composition", async () => {
     const gateways = createMockGateways();
     setGatewaysForTests(gateways);

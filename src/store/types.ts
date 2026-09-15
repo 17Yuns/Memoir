@@ -108,6 +108,7 @@ export type AppActions = {
   setViewMode(mode: ViewMode): void;
   setUiScale(scale: number): void;
   setSidebarCollapsed(collapsed: boolean): void;
+  toggleFocus(): void;
   setLayout(layout: Partial<WorkspaceLayoutState>): void;
   setSettings(settings: AppSettings): void;
   resetSettings(): void;

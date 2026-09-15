@@ -105,7 +105,6 @@ export const EditorWorkspace = forwardRef<EditorHandle, {
   forwardedRef,
 ) {
   const editorRef = useRef<EditorHandle>(null);
-  const sidebarCollapsedBeforeFocusRef = useRef<boolean | null>(null);
   const previewPaneRef = useRef<HTMLElement>(null);
   const programmaticScrollRef = useRef<Record<ScrollPane, ProgrammaticScroll | null>>({
     editor: null,
@@ -122,7 +121,7 @@ export const EditorWorkspace = forwardRef<EditorHandle, {
   } | null>(null);
   const workspaceRoot = useAppStore((state) => state.workspaceRoot);
   const isSidebarCollapsed = useAppStore((state) => state.isSidebarCollapsed);
-  const setSidebarCollapsed = useAppStore((state) => state.setSidebarCollapsed);
+  const toggleFocus = useAppStore((state) => state.toggleFocus);
   const libraryCollapsed = useAppStore((state) => state.layout.libraryCollapsed);
   const notes = useAppStore((state) => state.notes);
   const activePath = useAppStore((state) => state.activePath);
@@ -553,16 +552,7 @@ export const EditorWorkspace = forwardRef<EditorHandle, {
             active={Boolean(libraryCollapsed)}
             aria-controls="library-panel"
             label={t(libraryCollapsed ? "layout.exitFocus" : "layout.enterFocus")}
-            onClick={() => {
-              if (!libraryCollapsed) {
-                sidebarCollapsedBeforeFocusRef.current = isSidebarCollapsed;
-                setSidebarCollapsed(true);
-              } else if (sidebarCollapsedBeforeFocusRef.current !== null) {
-                setSidebarCollapsed(sidebarCollapsedBeforeFocusRef.current);
-                sidebarCollapsedBeforeFocusRef.current = null;
-              }
-              setLayout({ libraryCollapsed: !libraryCollapsed });
-            }}
+            onClick={toggleFocus}
             style={editorStyles.mobileHidden}
           >
             <Focus {...stylex.props(editorStyles.icon)} />

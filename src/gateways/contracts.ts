@@ -65,7 +65,7 @@ export interface WorkspaceGateway {
     root: string,
     settings: AiSettings,
     messages: AiChatMessage[],
-    target: AiRewriteTarget,
+    target: AiRewriteTarget | null,
     onProgress?: (progress: AiChatProgress) => void,
   ): Promise<AiChatResponse>;
 }

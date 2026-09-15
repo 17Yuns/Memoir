@@ -387,8 +387,38 @@ impl Default for GeneralSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ShortcutSettings {
+    pub save: Option<String>,
+    pub new_note: Option<String>,
+    pub open_settings: Option<String>,
+    pub toggle_sidebar: Option<String>,
+    pub toggle_focus: Option<String>,
+    pub zoom_in: Option<String>,
+    pub zoom_out: Option<String>,
+    pub reset_zoom: Option<String>,
+}
+
+impl Default for ShortcutSettings {
+    fn default() -> Self {
+        Self {
+            save: Some("Mod+KeyS".into()),
+            new_note: Some("Mod+KeyN".into()),
+            open_settings: Some("Mod+Comma".into()),
+            toggle_sidebar: Some("Mod+KeyB".into()),
+            toggle_focus: Some("Mod+Shift+KeyF".into()),
+            zoom_in: Some("Mod+Equal".into()),
+            zoom_out: Some("Mod+Minus".into()),
+            reset_zoom: Some("Mod+Digit0".into()),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct AppSettings {
+    #[serde(default)]
+    pub shortcuts: ShortcutSettings,
     #[serde(default)]
     pub appearance: AppearanceSettings,
     #[serde(default)]

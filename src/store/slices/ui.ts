@@ -17,7 +17,21 @@ type UiSliceContext = {
 };
 
 export function createUiSlice({ set, get, persistPreferences, onSettingsChanged }: UiSliceContext) {
+  let sidebarCollapsedBeforeFocus: boolean | null = null;
   return {
+    toggleFocus() {
+      const state = get();
+      const entering = !state.layout.libraryCollapsed;
+      if (entering) sidebarCollapsedBeforeFocus = state.isSidebarCollapsed;
+      set({
+        isSidebarCollapsed: entering
+          ? true
+          : sidebarCollapsedBeforeFocus ?? state.isSidebarCollapsed,
+        layout: { ...state.layout, libraryCollapsed: entering },
+      });
+      if (!entering) sidebarCollapsedBeforeFocus = null;
+      persistPreferences();
+    },
     setLibraryPanelMode(libraryPanelMode: LibraryPanelMode) {
       get().setLayout({ libraryCollapsed: false });
       set({

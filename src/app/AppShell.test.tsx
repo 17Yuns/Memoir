@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_SIDEBAR_WIDTH, DEFAULT_WORKSPACE_LAYOUT } from "../domain/layout";
 import { DEFAULT_SETTINGS } from "../domain/settings";
 import { resetAppUpdateCheckForTests } from "../features/update/useAppUpdateCheck";
@@ -8,6 +8,16 @@ import { setGatewaysForTests } from "../gateways";
 import { useAppStore } from "../store/app-store";
 import { createMockGateways } from "../test/mock-gateways";
 import AppShell from "./AppShell";
+
+beforeAll(async () => {
+  // Keep cold module transforms outside waitFor's DOM readiness timeout.
+  // Exercise the real components through AppShell's nested Suspense boundaries.
+  await Promise.all([
+    import("../features/editor/EditorWorkspace"),
+    import("../features/editor/EditorPane"),
+    import("../features/preview/PreviewPane"),
+  ]);
+});
 
 function dispatchPointer(target: Element, type: string, clientX: number) {
   fireEvent(

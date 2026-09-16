@@ -56,6 +56,7 @@ const VIRTUAL_ROW_COMPACT = 88;
 export function NoteList({
   onCreate,
   onRename,
+  onMove,
   onDelete,
   onInsertAttachment,
   aiRewriteTarget = null,
@@ -67,6 +68,7 @@ export function NoteList({
 }: {
   onCreate: () => void;
   onRename: (path: string) => void;
+  onMove: (path: string) => void;
   onDelete: (path: string) => void;
   onInsertAttachment?: (markdown: string) => void;
   aiRewriteTarget?: AiRewriteTarget | null;
@@ -323,6 +325,7 @@ export function NoteList({
         />
       </ContextMenu>
       <NoteContextMenu
+        onMove={onMove}
         onClose={() => setMenuTarget(null)}
         onDelete={onDelete}
         onRename={onRename}

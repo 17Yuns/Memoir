@@ -14,6 +14,7 @@ type WorkspaceSliceContext = {
   deleteFolder: (folder: string) => Promise<void>;
   rebuildIndex: () => Promise<void>;
   renameNote: (relativePath: string, newRelativePath: string) => Promise<void>;
+  moveNote: (relativePath: string, folder: string) => Promise<void>;
   renameActiveNote: (newRelativePath: string) => Promise<void>;
   deleteNote: (relativePath: string) => Promise<void>;
   deleteActiveNote: () => Promise<void>;
@@ -31,6 +32,7 @@ export function createWorkspaceSlice({
   deleteFolder,
   rebuildIndex,
   renameNote,
+  moveNote,
   renameActiveNote,
   deleteNote,
   deleteActiveNote,
@@ -47,6 +49,7 @@ export function createWorkspaceSlice({
     deleteFolder,
     rebuildIndex,
     renameNote,
+    moveNote,
     renameActiveNote,
     deleteNote,
     deleteActiveNote,

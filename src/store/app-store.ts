@@ -672,7 +672,11 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
       }
     };
 
-    const renameNoteAction = async (relativePath: string, newRelativePath: string) => {
+    const renameNoteAction = async (
+      relativePath: string,
+      newRelativePath: string,
+      errorKey: "errors.renameNote" | "errors.moveNote" = "errors.renameNote",
+    ) => {
       syncLiveEditorContent();
       const { workspaceRoot, activePath, content, savedContent, notes } = get();
       const trimmed = newRelativePath.trim();
@@ -707,9 +711,15 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
       } catch (error) {
         set({
           isLoading: false,
-          error: storeT(get().settings, "errors.renameNote", { message: toMessage(error) }),
+          error: storeT(get().settings, errorKey, { message: toMessage(error) }),
         });
       }
+    };
+
+    const moveNoteAction = async (relativePath: string, folder: string) => {
+      const destination = normalizeFolderKey(folder);
+      const fileName = relativePath.split("/").pop() || relativePath;
+      await renameNoteAction(relativePath, destination ? `${destination}/${fileName}` : fileName, "errors.moveNote");
     };
 
     const renameActiveNoteAction = async (newRelativePath: string) => {
@@ -1082,6 +1092,7 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
         deleteFolder: (folder) => mutateFolder(folder),
         rebuildIndex: rebuildIndexAction,
         renameNote: renameNoteAction,
+        moveNote: moveNoteAction,
         renameActiveNote: renameActiveNoteAction,
         deleteNote: deleteNoteAction,
         deleteActiveNote: deleteActiveNoteAction,

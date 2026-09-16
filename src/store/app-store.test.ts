@@ -9,6 +9,58 @@ function translated(store: ReturnType<typeof createAppStore>, key: "status.draft
 }
 
 describe("app store actions", () => {
+  it("moves an active note across folders and back to root without losing its draft or favorite", async () => {
+    const gateways = createMockGateways();
+    const store = createAppStore(gateways);
+    await store.getState().openWorkspace("/workspace");
+    await store.getState().toggleFavorite("one.md");
+    store.getState().setContent("# Unsaved draft");
+    const savedContent = store.getState().savedContent;
+    store.setState({ scopedFilter: { type: "folder", value: "" } });
+
+    await store.getState().moveNote("one.md", "归档/资料");
+
+    expect(gateways.workspace.files.has("one.md")).toBe(false);
+    expect(gateways.workspace.files.get("归档/资料/one.md")).toBe(savedContent);
+    expect(store.getState()).toMatchObject({
+      activePath: "归档/资料/one.md",
+      loadedContentPath: "归档/资料/one.md",
+      content: "# Unsaved draft",
+      savedContent,
+      favoritePaths: ["归档/资料/one.md"],
+      error: "",
+    });
+    expect(gateways.persistence.drafts.get("/workspace:归档/资料/one.md")).toBe("# Unsaved draft");
+    expect(gateways.persistence.drafts.has("/workspace:one.md")).toBe(false);
+    await store.getState().moveNote("归档/资料/one.md", "");
+    expect(store.getState().activePath).toBe("one.md");
+    expect(store.getState().content).toBe("# Unsaved draft");
+    expect(store.getState().favoritePaths).toEqual(["one.md"]);
+    await store.getState().saveActiveNote();
+    expect(gateways.workspace.files.get("one.md")).toBe("# Unsaved draft");
+  });
+
+  it("leaves another active editor unchanged and reports move failures without changing paths", async () => {
+    const gateways = createMockGateways();
+    gateways.workspace.files.set("other.mdx", "# Other");
+    const store = createAppStore(gateways);
+    await store.getState().openWorkspace("/workspace");
+    store.getState().setContent("# Keep editing");
+    await store.getState().moveNote("other.mdx", "archive");
+    expect(gateways.workspace.files.get("archive/other.mdx")).toBe("# Other");
+    expect(store.getState().activePath).toBe("one.md");
+    expect(store.getState().content).toBe("# Keep editing");
+    const rename = vi.spyOn(gateways.workspace, "renameNote").mockRejectedValue(new Error("Target already exists"));
+    await store.getState().moveNote("one.md", "");
+    expect(rename).not.toHaveBeenCalled();
+    await store.getState().moveNote("one.md", "archive");
+    expect(store.getState().error).toContain("Target already exists");
+    expect(store.getState().activePath).toBe("one.md");
+    expect(store.getState().content).toBe("# Keep editing");
+    expect(gateways.workspace.files.has("one.md")).toBe(true);
+    expect(store.getState().isLoading).toBe(false);
+  });
+
   it("persists custom shortcuts and restores them on initialization", async () => {
     const gateways = createMockGateways();
     const store = createAppStore(gateways);

@@ -67,6 +67,7 @@ describe("NoteList", () => {
     });
     const view = render(
       <NoteList
+        onMove={() => undefined}
         onCreate={() => undefined}
         onDelete={() => undefined}
         onRename={() => undefined}
@@ -123,6 +124,7 @@ describe("NoteList", () => {
     });
     const view = render(
       <NoteList
+        onMove={() => undefined}
         onCreate={() => undefined}
         onDelete={() => undefined}
         onRename={() => undefined}
@@ -163,6 +165,7 @@ describe("NoteList", () => {
     });
     render(
       <NoteList
+        onMove={() => undefined}
         onCreate={() => undefined}
         onDelete={() => undefined}
         onRename={() => undefined}
@@ -202,6 +205,7 @@ describe("NoteList", () => {
     const user = userEvent.setup();
     const view = render(
       <NoteList
+        onMove={() => undefined}
         onCreate={() => undefined}
         onDelete={() => undefined}
         onRename={() => undefined}
@@ -236,6 +240,7 @@ describe("NoteList", () => {
 
     const view = render(
       <NoteList
+        onMove={() => undefined}
         onCreate={() => undefined}
         onDelete={() => undefined}
         onRename={() => undefined}
@@ -262,6 +267,7 @@ describe("NoteList", () => {
     });
     const view = render(
       <NoteList
+        onMove={() => undefined}
         onCreate={() => undefined}
         onDelete={() => undefined}
         onRename={() => undefined}
@@ -298,6 +304,7 @@ describe("NoteList", () => {
     const user = userEvent.setup();
     const view = render(
       <NoteList
+        onMove={() => undefined}
         onCreate={() => undefined}
         onDelete={() => undefined}
         onRename={() => undefined}
@@ -338,6 +345,7 @@ describe("NoteList", () => {
     });
     const view = render(
       <NoteList
+        onMove={() => undefined}
         onCreate={() => undefined}
         onDelete={() => undefined}
         onRename={() => undefined}
@@ -360,6 +368,7 @@ describe("NoteList", () => {
     });
     const view = render(
       <NoteList
+        onMove={() => undefined}
         onCreate={() => undefined}
         onDelete={() => undefined}
         onRename={() => undefined}
@@ -382,6 +391,7 @@ describe("NoteList", () => {
     const user = userEvent.setup();
     const view = render(
       <NoteList
+        onMove={() => undefined}
         onCreate={() => undefined}
         onDelete={() => undefined}
         onRename={() => undefined}
@@ -411,6 +421,7 @@ describe("NoteList", () => {
     });
     const view = render(
       <NoteList
+        onMove={() => undefined}
         aiRewriteTarget={{
           path: "alpha.md",
           from: 0,
@@ -430,8 +441,9 @@ describe("NoteList", () => {
     expect(view.queryByRole("button", { name: "笔记" })).not.toBeInTheDocument();
   });
 
-  it("opens a note context menu for rename, favorite and delete", async () => {
+  it("opens a note context menu for rename, move, favorite and delete", async () => {
     const onRename = vi.fn();
+    const onMove = vi.fn();
     const onDelete = vi.fn();
     useAppStore.setState({
       workspaceRoot: "/workspace",
@@ -455,7 +467,7 @@ describe("NoteList", () => {
     });
     const user = userEvent.setup();
     const view = render(
-      <NoteList onCreate={() => undefined} onDelete={onDelete} onRename={onRename} />,
+      <NoteList onMove={onMove} onCreate={() => undefined} onDelete={onDelete} onRename={onRename} />,
     );
     const card = view.getByRole("button", { name: "alpha" });
 
@@ -470,6 +482,10 @@ describe("NoteList", () => {
     fireEvent.contextMenu(card, { clientX: 24, clientY: 48 });
     await user.click(view.getByRole("menuitem", { name: "重命名" }));
     expect(onRename).toHaveBeenCalledWith("alpha.md");
+
+    fireEvent.contextMenu(card, { clientX: 24, clientY: 48 });
+    await user.click(view.getByRole("menuitem", { name: "移动到目录…" }));
+    expect(onMove).toHaveBeenCalledWith("alpha.md");
 
     fireEvent.contextMenu(card, { clientX: 24, clientY: 48 });
     await user.click(view.getByRole("menuitem", { name: "删除" }));
@@ -501,7 +517,7 @@ describe("NoteList", () => {
     });
     const user = userEvent.setup();
     const view = render(
-      <NoteList onCreate={() => undefined} onDelete={() => undefined} onRename={() => undefined} />,
+      <NoteList onMove={() => undefined} onCreate={() => undefined} onDelete={() => undefined} onRename={() => undefined} />,
     );
 
     fireEvent.contextMenu(view.getByRole("button", { name: "alpha" }), {
@@ -531,7 +547,7 @@ describe("NoteList", () => {
     });
     const user = userEvent.setup();
     const view = render(
-      <NoteList onCreate={() => undefined} onDelete={() => undefined} onRename={() => undefined} />,
+      <NoteList onMove={() => undefined} onCreate={() => undefined} onDelete={() => undefined} onRename={() => undefined} />,
     );
 
     fireEvent.contextMenu(view.getByRole("button", { name: "alpha" }), {

@@ -1,5 +1,5 @@
 import * as stylex from "@stylexjs/stylex";
-import { Copy, ExternalLink, FileDown, FileText, PencilLine, Star, Trash2 } from "lucide-react";
+import { Copy, ExternalLink, FileDown, FileText, FolderInput, PencilLine, Star, Trash2 } from "lucide-react";
 import { exportNotePdf } from "../export/export-note-pdf";
 import {
   ContextMenu,
@@ -40,11 +40,13 @@ export function NoteContextMenu({
   target,
   onClose,
   onRename,
+  onMove,
   onDelete,
 }: {
   target: NoteMenuTarget | null;
   onClose: () => void;
   onRename: (path: string) => void;
+  onMove: (path: string) => void;
   onDelete: (path: string) => void;
 }) {
   const notes = useAppStore((state) => state.notes);
@@ -79,6 +81,11 @@ export function NoteContextMenu({
         icon={<PencilLine />}
         label={t("menu.rename")}
         onSelect={() => onRename(note.relativePath)}
+      />
+      <ContextMenuItem
+        icon={<FolderInput />}
+        label={t("menu.moveNote")}
+        onSelect={() => onMove(note.relativePath)}
       />
       <ContextMenuItem
         icon={<Copy />}

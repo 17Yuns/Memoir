@@ -13,6 +13,7 @@ import {
   Combobox,
   Dialog,
   Input,
+  Select,
   TagInput,
 } from "../../components/ui";
 import { collectFolderPaths, normalizeFolderKey } from "../../domain/folders";
@@ -35,6 +36,7 @@ type FormDialog =
   | { type: "createFolder"; parent: string; name: string }
   | { type: "renameFolder"; from: string; name: string }
   | { type: "rename"; from: string; name: string }
+  | { type: "move"; from: string; folder: string }
   | null;
 
 function deleteNoteTitle(
@@ -52,6 +54,7 @@ type WorkspaceDialogActions = {
   openRenameFolder: (folder: string) => void;
   openDeleteFolder: (folder: string) => void;
   openRename: (path?: string) => void;
+  openMove: (path?: string) => void;
   openDelete: (path?: string) => void;
 };
 
@@ -77,6 +80,7 @@ export function WorkspaceDialogsProvider({ children }: { children: ReactNode }) 
   const deleteFolder = useAppStore((state) => state.deleteFolder);
   const isLoading = useAppStore((state) => state.isLoading);
   const renameNote = useAppStore((state) => state.renameNote);
+  const moveNote = useAppStore((state) => state.moveNote);
   const deleteNote = useAppStore((state) => state.deleteNote);
   const { t, locale } = useI18n();
   const folderOptions = useMemo(() => {
@@ -105,6 +109,7 @@ export function WorkspaceDialogsProvider({ children }: { children: ReactNode }) 
     [locale, notes],
   );
   const [formDialog, setFormDialog] = useState<FormDialog>(null);
+  const [moveError, setMoveError] = useState("");
   const [deleteFolderTarget, setDeleteFolderTarget] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const updateCreate = (
@@ -154,6 +159,13 @@ export function WorkspaceDialogsProvider({ children }: { children: ReactNode }) 
         const target = typeof path === "string" && path ? path : activePath;
         if (target) setDeleteTarget(target);
       },
+      openMove: (path) => {
+        const target = typeof path === "string" && path ? path : activePath;
+        if (target) {
+          setMoveError("");
+          setFormDialog({ type: "move", from: target, folder: folderName(target) });
+        }
+      },
     }),
     [activePath, scopedFilter],
   );
@@ -182,6 +194,15 @@ export function WorkspaceDialogsProvider({ children }: { children: ReactNode }) 
       const parent = folderName(formDialog.from);
       await renameFolder(formDialog.from, parent ? `${parent}/${name}` : name);
       if (useAppStore.getState().error) return;
+    } else if (formDialog.type === "move") {
+      if (formDialog.folder === folderName(formDialog.from)) return;
+      setMoveError("");
+      await moveNote(formDialog.from, formDialog.folder);
+      const error = useAppStore.getState().error;
+      if (error) {
+        setMoveError(error);
+        return;
+      }
     } else {
       await renameNote(formDialog.from, resolveNoteRenamePath(formDialog.from, formDialog.name));
     }
@@ -196,11 +217,11 @@ export function WorkspaceDialogsProvider({ children }: { children: ReactNode }) 
           <>
             <Button onClick={closeForm}>{t("common.cancel")}</Button>
             <Button
-              disabled={isLoading || (formDialog?.type === "createFolder" && !formDialog.name.trim()) || (formDialog?.type === "renameFolder" && (!formDialog.name.trim() || formDialog.name.trim().startsWith(".") || /[\\/]/.test(formDialog.name)))}
+              disabled={isLoading || (formDialog?.type === "move" && formDialog.folder === folderName(formDialog.from)) || (formDialog?.type === "createFolder" && !formDialog.name.trim()) || (formDialog?.type === "renameFolder" && (!formDialog.name.trim() || formDialog.name.trim().startsWith(".") || /[\\/]/.test(formDialog.name)))}
               type="submit"
               variant="primary"
             >
-              {(formDialog?.type === "rename" || formDialog?.type === "renameFolder") ? t("common.rename") : t("common.create")}
+              {formDialog?.type === "move" ? t("common.move") : (formDialog?.type === "rename" || formDialog?.type === "renameFolder") ? t("common.rename") : t("common.create")}
             </Button>
           </>
         }
@@ -208,7 +229,7 @@ export function WorkspaceDialogsProvider({ children }: { children: ReactNode }) 
         onSubmit={() => void submitForm()}
         open={Boolean(formDialog)}
         title={
-          formDialog?.type === "renameFolder" ? t("dialog.renameFolder") : formDialog?.type === "rename"
+          formDialog?.type === "move" ? t("dialog.moveNote") : formDialog?.type === "renameFolder" ? t("dialog.renameFolder") : formDialog?.type === "rename"
             ? t("dialog.renameNote")
             : formDialog?.type === "createFolder"
               ? t("dialog.newFolder")
@@ -254,6 +275,26 @@ export function WorkspaceDialogsProvider({ children }: { children: ReactNode }) 
                 value={formDialog.tags}
               />
             </div>
+          </div>
+        ) : formDialog?.type === "move" ? (
+          <div {...stylex.props(styles.form)}>
+            <div {...stylex.props(styles.folderParent)}>
+              <span>{t("dialog.currentNote")}</span>
+              <strong title={formDialog.from} {...stylex.props(styles.folderParentPath)}>{formDialog.from}</strong>
+            </div>
+            <label {...stylex.props(styles.label)}>
+              {t("dialog.destinationFolder")}
+              <Select
+                label={t("dialog.destinationFolder")}
+                onChange={(folder) => {
+                  setMoveError("");
+                  setFormDialog({ ...formDialog, folder });
+                }}
+                options={[{ value: "", label: t("library.rootFolder") }, ...folderOptions]}
+                value={formDialog.folder}
+              />
+            </label>
+            {moveError && <div role="alert" {...stylex.props(styles.error)}>{moveError}</div>}
           </div>
         ) : formDialog?.type === "createFolder" ? (
           <div {...stylex.props(styles.form)}>
@@ -316,6 +357,11 @@ export function WorkspaceDialogsProvider({ children }: { children: ReactNode }) 
 }
 
 const styles = stylex.create({
+  error: {
+    color: colors.danger,
+    fontSize: 12,
+    overflowWrap: "anywhere",
+  },
   form: {
     display: "grid",
     gap: 12,

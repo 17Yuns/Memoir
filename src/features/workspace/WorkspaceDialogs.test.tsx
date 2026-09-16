@@ -10,11 +10,14 @@ afterEach(() => {
     workspaceRoot: "/workspace",
     notes: [],
     folderAppearances: {},
+    libraryStats: { ...useAppStore.getState().libraryStats, folders: [] },
     activePath: null,
     loadedContentPath: null,
     content: "",
     savedContent: "",
     scopedFilter: null,
+    error: "",
+    isLoading: false,
   });
 });
 
@@ -44,6 +47,45 @@ function Harness() {
 }
 
 describe("WorkspaceDialogs", () => {
+  it("moves a note to nested, empty and root folders and keeps failures open for retry", async () => {
+    const moveNote = vi.fn().mockResolvedValue(undefined);
+    useAppStore.setState({
+      moveNote,
+      activePath: "工作/alpha.mdx",
+      error: "",
+      isLoading: false,
+      libraryStats: {
+        ...useAppStore.getState().libraryStats,
+        folders: [{ folder: "工作", count: 1 }, { folder: "归档/空目录", count: 0 }],
+      },
+    });
+    function MoveHarness() {
+      const { openMove } = useWorkspaceDialogs();
+      return <button onClick={() => openMove()}>打开移动</button>;
+    }
+    const user = userEvent.setup();
+    const view = render(<WorkspaceDialogsProvider><MoveHarness /></WorkspaceDialogsProvider>);
+    await user.click(view.getByRole("button", { name: "打开移动" }));
+    expect(view.getByRole("button", { name: "移动" })).toBeDisabled();
+    await user.click(view.getByRole("combobox", { name: "目标目录" }));
+    expect(view.getByRole("option", { name: "归档" })).toBeInTheDocument();
+    await user.click(view.getByRole("option", { name: "归档/空目录" }));
+    moveNote.mockImplementationOnce(async () => { useAppStore.setState({ error: "移动失败：目标文件已存在" }); });
+    await user.click(view.getByRole("button", { name: "移动" }));
+    expect(moveNote).toHaveBeenLastCalledWith("工作/alpha.mdx", "归档/空目录");
+    expect(view.getByRole("dialog", { name: "移动笔记" })).toBeInTheDocument();
+    expect(view.getByRole("alert")).toHaveTextContent("目标文件已存在");
+    await user.click(view.getByRole("combobox", { name: "目标目录" }));
+    await user.click(view.getByRole("option", { name: "根目录" }));
+    moveNote.mockImplementationOnce(async () => { useAppStore.setState({ error: "" }); });
+    await user.click(view.getByRole("button", { name: "移动" }));
+    expect(moveNote).toHaveBeenLastCalledWith("工作/alpha.mdx", "");
+    await waitFor(() => expect(view.queryByRole("dialog", { name: "移动笔记" })).not.toBeInTheDocument());
+    await user.click(view.getByRole("button", { name: "打开移动" }));
+    await user.click(view.getByRole("button", { name: "取消" }));
+    expect(moveNote).toHaveBeenCalledTimes(2);
+  });
+
   it("renames only the folder basename and confirms deletion", async () => {
     const renameFolder = vi.fn().mockResolvedValue(undefined);
     const deleteFolder = vi.fn().mockResolvedValue(undefined);

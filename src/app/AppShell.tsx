@@ -93,7 +93,7 @@ function WorkspaceLayout({
   const setUiScale = useAppStore((state) => state.setUiScale);
   const setSidebarCollapsed = useAppStore((state) => state.setSidebarCollapsed);
   const saveActiveNote = useAppStore((state) => state.saveActiveNote);
-  const { openCreate, openCreateFolder, openRenameFolder, openDeleteFolder, openDelete, openRename } = useWorkspaceDialogs();
+  const { openCreate, openCreateFolder, openRenameFolder, openDeleteFolder, openDelete, openRename, openMove } = useWorkspaceDialogs();
   const { t } = useI18n();
   const editorRef = useRef<EditorHandle>(null);
   const shellRef = useRef<HTMLElement>(null);
@@ -277,6 +277,7 @@ function WorkspaceLayout({
           )}
         >
           <NoteList
+            onMove={openMove}
             aiRewriteTarget={aiRewriteTarget}
             onCreate={() => openCreate()}
             onDelete={openDelete}

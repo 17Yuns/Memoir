@@ -22,6 +22,19 @@ vi.mock("@tauri-apps/api/event", () => ({
 }));
 
 describe("Tauri gateways", () => {
+  it("persists and clears the last opened note with camelCase arguments", async () => {
+    const { TauriPersistenceGateway } = await import("./tauri");
+    const gateway = new TauriPersistenceGateway();
+    await gateway.setLastOpenNote("/notes", "folder/note.md");
+    expect(invoke).toHaveBeenLastCalledWith("set_last_open_note", {
+      workspaceRoot: "/notes", relativePath: "folder/note.md",
+    });
+    await gateway.setLastOpenNote("/notes", null);
+    expect(invoke).toHaveBeenLastCalledWith("set_last_open_note", {
+      workspaceRoot: "/notes", relativePath: null,
+    });
+  });
+
   beforeEach(() => {
     invoke.mockReset();
     open.mockReset();

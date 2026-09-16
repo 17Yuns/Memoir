@@ -697,6 +697,13 @@ export class BrowserPersistenceGateway implements PersistenceGateway {
   private state = createDefaultState();
   private drafts = new Map<string, string>();
 
+  async setLastOpenNote(workspaceRoot: string, relativePath: string | null) {
+    const notes = { ...this.state.lastOpenNotes };
+    if (relativePath === null) delete notes[workspaceRoot];
+    else notes[workspaceRoot] = relativePath;
+    this.state = { ...this.state, lastOpenNotes: notes };
+  }
+
   async loadAppState() {
     return structuredClone(this.state);
   }

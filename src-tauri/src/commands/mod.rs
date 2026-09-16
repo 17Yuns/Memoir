@@ -7,7 +7,7 @@ mod workspace;
 pub use ai::{chat_with_note, get_vector_index_status, index_vector_workspace, semantic_search};
 pub use app_state::{
     delete_draft, drafts_exist, load_app_state, migrate_legacy_state, read_draft, save_preferences,
-    set_favorite, set_folder_appearance, skip_app_update, write_draft,
+    set_favorite, set_folder_appearance, set_last_open_note, skip_app_update, write_draft,
 };
 pub use sync::{get_cloud_sync_profile, run_cloud_sync, save_cloud_sync_profile, test_cloud_sync};
 pub use system::{check_app_update, fetch_link_preview_html};

@@ -589,6 +589,8 @@ pub struct AppState {
     #[serde(default)]
     pub last_workspace: Option<String>,
     #[serde(default)]
+    pub last_open_notes: BTreeMap<String, String>,
+    #[serde(default)]
     pub sidebar_collapsed: bool,
     #[serde(default)]
     pub layout: WorkspaceLayout,
@@ -615,6 +617,7 @@ impl Default for AppState {
             preferences: AppSettings::default(),
             recent_workspaces: Vec::new(),
             last_workspace: None,
+            last_open_notes: BTreeMap::new(),
             sidebar_collapsed: false,
             layout: WorkspaceLayout::default(),
             favorites: BTreeMap::new(),

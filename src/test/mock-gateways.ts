@@ -345,6 +345,13 @@ export class MockWorkspaceGateway implements WorkspaceGateway {
 }
 
 export class MockPersistenceGateway implements PersistenceGateway {
+  async setLastOpenNote(workspaceRoot: string, relativePath: string | null) {
+    const notes = { ...this.state.lastOpenNotes };
+    if (relativePath === null) delete notes[workspaceRoot];
+    else notes[workspaceRoot] = relativePath;
+    this.state = { ...this.state, lastOpenNotes: notes };
+  }
+
   state: AppState = {
     version: 1,
     preferences: DEFAULT_SETTINGS,

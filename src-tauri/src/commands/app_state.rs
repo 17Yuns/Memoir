@@ -15,6 +15,15 @@ pub fn load_app_state(services: State<'_, AppServices>) -> Result<AppState, AppE
 }
 
 #[tauri::command]
+pub fn set_last_open_note(
+    services: State<'_, AppServices>,
+    workspace_root: String,
+    relative_path: Option<String>,
+) -> Result<(), AppError> {
+    services.app_state.set_last_open_note(workspace_root, relative_path)
+}
+
+#[tauri::command]
 pub fn drafts_exist(
     services: State<'_, AppServices>,
     workspace_root: String,

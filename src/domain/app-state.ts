@@ -15,6 +15,7 @@ export type AppState = {
   preferences: AppSettings;
   recentWorkspaces: string[];
   lastWorkspace: string | null;
+  lastOpenNotes?: Record<string, string>;
   sidebarCollapsed: boolean;
   layout?: WorkspaceLayoutState;
   favorites: Record<string, string[]>;

@@ -160,6 +160,17 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
   };
 
   const store = create<AppStore>((set, get) => {
+    let lastOpenNoteWrite = Promise.resolve();
+    const persistLastOpenNote = (root: string, path: string | null) => {
+      // Keep rapid selections in order without delaying the editor update.
+      lastOpenNoteWrite = lastOpenNoteWrite
+        .then(() => gateways.persistence.setLastOpenNote(root, path))
+        .catch((error) => {
+          set({ error: storeT(get().settings, "errors.savePreferences", { message: toMessage(error) }) });
+        });
+      return lastOpenNoteWrite;
+    };
+
     const persistPreferences = () => {
       if (preferencesTimer !== null) window.clearTimeout(preferencesTimer);
       preferencesTimer = window.setTimeout(async () => {
@@ -473,6 +484,7 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
           loadedContentPath: relativePath, isLoading: false, error: "", mobilePanel: "editor",
           isSaving: false, status: cached.content !== cached.savedContent
             ? storeT(current.settings, "status.draftRestored") : storeT(current.settings, "status.loaded") });
+        await persistLastOpenNote(root, relativePath);
         return;
       }
       noteContentCache.delete(cacheKey);
@@ -482,12 +494,14 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
           gateways.workspace.readNote(root, relativePath),
           gateways.persistence.readDraft(root, relativePath),
         ]);
-        if (get().activePath !== relativePath) return;
+        if (get().workspaceRoot !== root || get().activePath !== relativePath) return;
         cacheNoteContent(root, relativePath, draft ?? savedContent, savedContent, targetModifiedMs);
         set({ content: draft ?? savedContent, savedContent, loadedContentPath: relativePath,
           isLoading: false, status: draft !== null && draft !== savedContent
             ? storeT(get().settings, "status.draftRestored") : storeT(get().settings, "status.loaded") });
+        await persistLastOpenNote(root, relativePath);
       } catch (error) {
+        if (get().workspaceRoot !== root || get().activePath !== relativePath) return;
         set({ isLoading: false, error: storeT(get().settings, "errors.loadNote", { message: toMessage(error) }) });
       }
     };
@@ -630,6 +644,7 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
             ? { activePath: null, loadedContentPath: null, content: "", savedContent: "" }
             : { activePath: remap(activePath!), loadedContentPath: remap(activePath!) } : {}),
         });
+        if (activeAffected) await persistLastOpenNote(root, get().activePath);
         const page = await gateways.workspace.queryLibrary(root, currentQuery());
         await applyLibraryPage(root, page, undefined, { selectIfNeeded: activeAffected });
         scheduleVectorIndex();
@@ -683,6 +698,7 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
         set(wasActive
           ? { activePath: renamed.note.relativePath, loadedContentPath: renamed.note.relativePath, favoritePaths }
           : { favoritePaths });
+        if (wasActive) await persistLastOpenNote(workspaceRoot, renamed.note.relativePath);
         const page = await gateways.workspace.queryLibrary(workspaceRoot, currentQuery());
         await applyLibraryPage(workspaceRoot, page, wasActive ? renamed.note.relativePath : undefined, {
           selectIfNeeded: wasActive,
@@ -714,6 +730,7 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
         const nextFavorites = get().favoritePaths.filter((path) => path !== relativePath);
         if (relativePath === activePath) {
           set({ activePath: null, loadedContentPath: null, content: "", savedContent: "", favoritePaths: nextFavorites });
+          await persistLastOpenNote(workspaceRoot, null);
         } else set({ favoritePaths: nextFavorites });
         const page = await gateways.workspace.queryLibrary(workspaceRoot, currentQuery());
         await applyLibraryPage(workspaceRoot, page, null, { selectIfNeeded: relativePath === activePath });
@@ -731,12 +748,21 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
       if (activePath) await deleteNoteAction(activePath);
     };
 
-    const refreshWorkspaceAction = async (preferredPath?: string | null) => {
+    const refreshWorkspaceAction = async (preferredPath?: string | null, restoreSelection = false) => {
       const root = get().workspaceRoot;
       if (!root) return;
       set({ isLoading: true, error: "" });
       try {
         const { page, attachments } = await loadWorkspaceSnapshot(gateways, root, currentQuery());
+        if (restoreSelection && preferredPath && !page.notes.some((note) => note.relativePath === preferredPath)) {
+          // A remembered note can be outside the first page of a large library.
+          const exists = page.stats.truncated && (await gateways.workspace.getNoteGraph(root))
+            .nodes.some((note) => note.relativePath === preferredPath);
+          if (!exists) {
+            preferredPath = null;
+            await persistLastOpenNote(root, null);
+          }
+        }
         set({ attachments });
         await applyLibraryPage(root, page, preferredPath);
         scheduleVectorIndex();
@@ -768,7 +794,7 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
         });
         if (workspaceRoot) {
           await loadCloudSyncProfile(workspaceRoot);
-          await get().refreshWorkspace();
+          await refreshWorkspaceAction(appState.lastOpenNotes?.[workspaceRoot], true);
           scheduleCloudSync(CLOUD_SYNC_OPEN_DELAY_MS);
         }
         set({ initialized: true });
@@ -804,6 +830,7 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
           set({ isLoading: false });
           return;
         }
+        await lastOpenNoteWrite;
         const persistedState = await gateways.persistence.savePreferences(
           get().settings,
           selectedRoot,
@@ -838,7 +865,7 @@ export function createAppStore(gateways: AppGateways = getGateways()) {
           libraryPanelMode: "notes",
         });
         await loadCloudSyncProfile(workspaceRoot);
-        await get().refreshWorkspace();
+        await refreshWorkspaceAction(persistedState.lastOpenNotes?.[workspaceRoot], true);
         scheduleCloudSync(CLOUD_SYNC_OPEN_DELAY_MS);
       } catch (error) {
         set({

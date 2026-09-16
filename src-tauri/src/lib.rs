@@ -13,7 +13,7 @@ use commands::{
     get_note_graph, get_vector_index_status, import_attachment, index_vector_workspace,
     load_app_state, migrate_legacy_state, query_library, read_draft, read_note, rebuild_index,
     reconcile_workspace, rename_note, run_cloud_sync, save_attachment, save_cloud_sync_profile,
-    save_preferences, scan_attachments, semantic_search, set_favorite, set_folder_appearance,
+    save_preferences, scan_attachments, semantic_search, set_favorite, set_folder_appearance, set_last_open_note,
     skip_app_update, test_cloud_sync, write_draft, write_export_file, write_note, AppServices,
 };
 use infrastructure::{app_data::AppDataRepository, filesystem::LocalFileSystem};
@@ -82,6 +82,7 @@ pub fn run() {
             import_attachment,
             delete_attachment,
             load_app_state,
+            set_last_open_note,
             check_app_update,
             skip_app_update,
             save_preferences,

@@ -92,6 +92,7 @@ export type SystemGateway = Pick<
 
 export interface PersistenceGateway {
   loadAppState(): Promise<AppState>;
+  setLastOpenNote(workspaceRoot: string, relativePath: string | null): Promise<void>;
   savePreferences(
     preferences: AppSettings,
     lastWorkspace: string | null,

@@ -30,6 +30,98 @@ describe("app store actions", () => {
     vi.useRealTimers();
   });
 
+  it("restores the last opened note and its draft after restarting", async () => {
+    const gateways = createMockGateways();
+    gateways.workspace.files.set("two.md", "# Two");
+    const store = createAppStore(gateways);
+    await store.getState().openWorkspace("/workspace");
+    await store.getState().selectNote("two.md");
+    await store.getState().selectNote("one.md");
+    await store.getState().selectNote("two.md"); // Restore from the content cache, too.
+    gateways.persistence.drafts.set("/workspace:two.md", "# Draft two");
+
+    const restored = createAppStore(gateways);
+    await restored.getState().initialize();
+    expect(restored.getState().activePath).toBe("two.md");
+    expect(restored.getState().content).toBe("# Draft two");
+    expect(restored.getState().savedContent).toBe("# Two");
+    expect(restored.getState().error).toBe("");
+  });
+
+  it("remembers a separate selection for each workspace", async () => {
+    const gateways = createMockGateways();
+    gateways.workspace.files.set("two.md", "# Two");
+    const store = createAppStore(gateways);
+    await store.getState().openWorkspace("/workspace");
+    await store.getState().selectNote("two.md");
+    await store.getState().openWorkspace("/other");
+    await store.getState().selectNote("one.md");
+    await store.getState().openWorkspace("/workspace");
+    expect(store.getState().activePath).toBe("two.md");
+    await store.getState().openWorkspace("/other");
+    expect(store.getState().activePath).toBe("one.md");
+  });
+
+  it("falls back when the remembered note was removed outside the app", async () => {
+    const gateways = createMockGateways();
+    gateways.persistence.state.lastWorkspace = "/workspace";
+    gateways.persistence.state.lastOpenNotes = { "/workspace": "missing.md" };
+    const store = createAppStore(gateways);
+    await store.getState().initialize();
+    expect(store.getState().activePath).toBe("one.md");
+    expect(store.getState().error).toBe("");
+    expect(gateways.persistence.state.lastOpenNotes?.["/workspace"]).toBe("one.md");
+  });
+
+  it("clears the remembered note when the workspace is now empty", async () => {
+    const gateways = createMockGateways();
+    gateways.workspace.files.clear();
+    gateways.persistence.state.lastWorkspace = "/workspace";
+    gateways.persistence.state.lastOpenNotes = { "/workspace": "missing.md" };
+    const store = createAppStore(gateways);
+    await store.getState().initialize();
+    expect(store.getState().activePath).toBeNull();
+    expect(store.getState().error).toBe("");
+    expect(gateways.persistence.state.lastOpenNotes?.["/workspace"]).toBeUndefined();
+  });
+
+  it("restores a remembered note outside the first library page", async () => {
+    const gateways = createMockGateways();
+    gateways.workspace.files.set("two.md", "# Two");
+    gateways.persistence.state.lastWorkspace = "/workspace";
+    gateways.persistence.state.lastOpenNotes = { "/workspace": "two.md" };
+    const page = await gateways.workspace.queryLibrary("/workspace", { q: "", nav: "all", folder: null, tag: null });
+    vi.spyOn(gateways.workspace, "reconcileWorkspace").mockResolvedValue({
+      notes: page.notes.filter((note) => note.relativePath !== "two.md"),
+      stats: { ...page.stats, truncated: true },
+    });
+    const store = createAppStore(gateways);
+    await store.getState().initialize();
+    expect(store.getState().activePath).toBe("two.md");
+    expect(store.getState().content).toBe("# Two");
+    expect(store.getState().error).toBe("");
+  });
+
+  it("persists renames and clears the selection when the last note is deleted", async () => {
+    const gateways = createMockGateways();
+    const store = createAppStore(gateways);
+    await store.getState().openWorkspace("/workspace");
+    await store.getState().renameActiveNote("renamed.md");
+    const restored = createAppStore(gateways);
+    await restored.getState().initialize();
+    expect(restored.getState().activePath).toBe("renamed.md");
+    await restored.getState().deleteActiveNote();
+    expect(gateways.persistence.state.lastOpenNotes?.["/workspace"]).toBeUndefined();
+  });
+
+  it("does not remember a note that failed to load", async () => {
+    const gateways = createMockGateways();
+    const store = createAppStore(gateways);
+    await store.getState().openWorkspace("/workspace");
+    await store.getState().selectNote("missing.md");
+    expect(gateways.persistence.state.lastOpenNotes?.["/workspace"]).toBe("one.md");
+  });
+
   it("renames a folder subtree while preserving drafts, favorites, appearance and selection", async () => {
     const gateways = createMockGateways();
     gateways.workspace.files.set("work/child/note.md", "# Saved");
@@ -44,6 +136,7 @@ describe("app store actions", () => {
     await store.getState().renameFolder("work", "renamed");
     expect(store.getState().error).toBe("");
     expect(store.getState().activePath).toBe("renamed/child/note.md");
+    expect(gateways.persistence.state.lastOpenNotes?.["/workspace"]).toBe("renamed/child/note.md");
     expect(store.getState().content).toBe("# Unsaved");
     expect(store.getState().savedContent).toBe("# Saved");
     expect(store.getState().scopedFilter).toEqual({ type: "folder", value: "renamed/child" });

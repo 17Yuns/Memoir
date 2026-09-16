@@ -226,6 +226,10 @@ export class TauriWorkspaceGateway implements WorkspaceGateway {
 }
 
 export class TauriPersistenceGateway implements PersistenceGateway {
+  setLastOpenNote(workspaceRoot: string, relativePath: string | null) {
+    return call<void>("set_last_open_note", { workspaceRoot, relativePath });
+  }
+
   loadAppState() {
     return call<AppState>("load_app_state");
   }

@@ -367,7 +367,32 @@ fn app_state_defaults_version_compatibility_and_favorites_are_isolated() {
     assert_eq!(upgraded.window, WindowFrameState::default());
     assert_eq!(upgraded.layout, crate::domain::WorkspaceLayout::default());
     assert!(upgraded.folder_appearances.is_empty());
+    assert!(upgraded.last_open_notes.is_empty());
     assert_eq!(upgraded.skipped_update_version, None);
+}
+
+#[test]
+fn last_open_note_persists_per_workspace_and_can_be_cleared() {
+    let app_data = tempdir().unwrap();
+    let workspace = tempdir().unwrap();
+    let other_workspace = tempdir().unwrap();
+    let root = workspace.path().canonicalize().unwrap().to_string_lossy().to_string();
+    let other_root = other_workspace.path().canonicalize().unwrap().to_string_lossy().to_string();
+    let repository = AppDataRepository::new(app_data.path().to_path_buf());
+    let service = AppStateService::new(repository.clone());
+    service.set_last_open_note(root.clone(), Some("folder/note.md".into())).unwrap();
+    service.set_last_open_note(other_root.clone(), Some("other.mdx".into())).unwrap();
+    service.save_preferences(AppSettings::default(), Some(root.clone()), false, None).unwrap();
+
+    let restarted = AppStateService::new(repository);
+    let state = restarted.load().unwrap();
+    assert_eq!(state.last_open_notes.get(&root).map(String::as_str), Some("folder/note.md"));
+    assert_eq!(state.last_open_notes.get(&other_root).map(String::as_str), Some("other.mdx"));
+    assert_eq!(restarted.set_last_open_note(root.clone(), Some("../outside.md".into())).unwrap_err().code, ErrorCode::InvalidPath);
+    restarted.set_last_open_note(root.clone(), None).unwrap();
+    let state = restarted.load().unwrap();
+    assert!(!state.last_open_notes.contains_key(&root));
+    assert!(state.last_open_notes.contains_key(&other_root));
 }
 
 #[test]

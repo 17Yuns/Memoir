@@ -31,6 +31,25 @@ impl AppStateService {
         self.repository.load_state()
     }
 
+    pub fn set_last_open_note(
+        &self,
+        workspace_root: String,
+        relative_path: Option<String>,
+    ) -> AppResult<()> {
+        let workspace_root = normalize_workspace_key(&workspace_root)?;
+        if let Some(path) = &relative_path {
+            validate_relative_path(path)?;
+        }
+        let _guard = self.state_lock.lock().unwrap_or_else(|error| error.into_inner());
+        let mut state = self.repository.load_state()?;
+        if let Some(path) = relative_path {
+            state.last_open_notes.insert(workspace_root, path);
+        } else {
+            state.last_open_notes.remove(&workspace_root);
+        }
+        self.repository.save_state(&state)
+    }
+
     pub fn save_preferences(
         &self,
         preferences: AppSettings,

@@ -37,6 +37,7 @@ import { WorkspaceSwitcher } from "../workspace/WorkspaceSwitcher";
 import { FolderAppearanceDialog } from "./FolderAppearanceDialog";
 import { FolderContextMenu, type FolderMenuTarget } from "./FolderContextMenu";
 import { isRootFolder, normalizeTag } from "./note-utils";
+import { useNoteDropFolder } from "./use-note-drag";
 import { accents } from "../../styles/tokens.stylex";
 import {
   folderRowMarker,
@@ -172,6 +173,8 @@ function FolderNavItem({
   onContextMenu: (event: MouseEvent) => void;
 }) {
   const { t } = useI18n();
+  const dropFolder = useNoteDropFolder();
+  const dropTarget = dropFolder === folder;
   const reservesToggleSlot = hasChildren || depth > 0;
   const folderColor = appearance?.color
     ? appearance.color === "ink"
@@ -184,6 +187,8 @@ function FolderNavItem({
     <div
       data-folder-color={appearance?.color}
       data-sidebar-folder-item=""
+      data-note-drop-folder={folder}
+      data-note-drop-target={dropTarget ? "" : undefined}
       {...stylex.props(
         folderRowMarker,
         sidebarStyles.navItem,
@@ -198,6 +203,7 @@ function FolderNavItem({
             ],
         active && sidebarStyles.active,
         active && appearance?.color && sidebarStyles.folderActive(folderColor),
+        dropTarget && sidebarStyles.folderDropTarget,
       )}
     >
       {!collapsed &&
@@ -282,6 +288,7 @@ export function LibrarySidebar({
   onOpenAi?: () => void;
   style?: stylex.StyleXStyles;
 }) {
+  const workspaceRoot = useAppStore((state) => state.workspaceRoot);
   const libraryStats = useAppStore((state) => state.libraryStats);
   const attachments = useAppStore((state) => state.attachments);
   const navFilter = useAppStore((state) => state.navFilter);
@@ -300,8 +307,15 @@ export function LibrarySidebar({
   const { t, locale } = useI18n();
   const compareLocale = dateLocale(locale);
   const folderTree = useMemo(
-    () => buildFolderTree(libraryStats.folders, compareLocale),
-    [compareLocale, libraryStats.folders],
+    () => {
+      const tree = buildFolderTree(libraryStats.folders, compareLocale);
+      // Keep the workspace root available as a move target even when empty.
+      if (workspaceRoot && !tree.some((node) => node.folder === "")) {
+        tree.unshift({ folder: "", name: "", count: 0, directCount: 0, children: [] });
+      }
+      return tree;
+    },
+    [compareLocale, libraryStats.folders, workspaceRoot],
   );
   const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => new Set());
   const tags = [...libraryStats.tags].sort((left, right) =>
@@ -382,7 +396,7 @@ export function LibrarySidebar({
         </IconButton>
       </header>
 
-      <div {...stylex.props(sidebarStyles.scroller)}>
+      <div data-library-folder-scroller="" {...stylex.props(sidebarStyles.scroller)}>
         <nav {...stylex.props(sidebarStyles.primaryNav)}>
           <NavButton
             active={notesNavActive && navFilter === "all" && !scopedFilter}

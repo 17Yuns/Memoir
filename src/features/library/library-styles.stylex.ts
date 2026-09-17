@@ -139,6 +139,7 @@ export const noteListStyles = stylex.create({
   semanticGroupHeader: { display: "flex", height: "24px", alignItems: "center", gap: "6px", paddingInline: "4px", color: colors.muted, fontSize: "10px", fontWeight: 600 },
   semanticGroupIcon: { width: "12px", height: "12px", color: accents.primary },
   semanticCard: {
+    userSelect: "none",
     position: "relative",
     display: "grid",
     gap: "4px",
@@ -174,6 +175,7 @@ export const noteListStyles = stylex.create({
     height,
   }),
   card: {
+    userSelect: "none",
     position: "relative",
     cursor: "pointer",
     borderColor: "transparent",
@@ -191,6 +193,22 @@ export const noteListStyles = stylex.create({
     transitionTimingFunction: motion.ease,
   },
   cardComfortable: { padding: "12px" },
+  dragPreview: {
+    position: "fixed",
+    zIndex: 1000,
+    pointerEvents: "none",
+    maxWidth: "240px",
+    overflow: "hidden",
+    padding: "8px 12px",
+    borderRadius: "8px",
+    backgroundColor: colors.elevated,
+    color: colors.text,
+    boxShadow: `0 4px 16px rgb(0 0 0 / 18%), inset 0 0 0 1px ${accents.primary}`,
+    fontSize: "12px",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+  },
+  dragPosition: (x: number, y: number) => ({ left: x, top: y }),
   cardCompact: { padding: "10px 12px" },
   cardActive: {
     borderColor: "transparent",
@@ -744,6 +762,10 @@ export const sidebarStyles = stylex.create({
     marginInline: { default: 0, "@media (min-width: 761px)": "auto" },
   },
   collapseButtonRight: { marginLeft: "auto" },
+  folderDropTarget: {
+    backgroundColor: accents.soft,
+    boxShadow: `inset 0 0 0 2px ${accents.primary}`,
+  },
   scroller: { minHeight: 0, flex: 1, overflowY: "auto" },
   primaryNav: { display: "grid", gap: "4px", padding: "8px 10px" },
   group: {

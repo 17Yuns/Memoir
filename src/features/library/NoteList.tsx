@@ -47,6 +47,7 @@ import type { NoteSortDirection, NoteSortField } from "../../domain/settings";
 import { extractHeadings, noteDisplayName, sortLibraryNotes, stripFrontmatter } from "./note-utils";
 import type { NoteMeta } from "../../domain/notes";
 import { noteListStyles, sharedLibraryStyles } from "./library-styles.stylex";
+import { NoteDragPreview, useNoteDrag } from "./use-note-drag";
 
 export const NOTE_LIST_VIRTUAL_THRESHOLD = 80;
 const VIRTUAL_OVERSCAN = 6;
@@ -78,6 +79,7 @@ export function NoteList({
   onSaveAiRewrite?: () => Promise<boolean>;
   style?: stylex.StyleXStyles;
 }) {
+  const noteDragHandlers = useNoteDrag();
   const notes = useAppStore((state) => state.notes);
   const activePath = useAppStore((state) => state.activePath);
   const workspaceRoot = useAppStore((state) => state.workspaceRoot);
@@ -171,7 +173,8 @@ export function NoteList({
   }, [query, settings.ai, t]);
 
   return (
-    <section data-note-list-panel="" {...stylex.props(noteListStyles.panel, style)}>
+    <section data-note-list-panel="" {...noteDragHandlers} {...stylex.props(noteListStyles.panel, style)}>
+      <NoteDragPreview />
       {mode !== "sync" && mode !== "ai" && (
         <PanelHeader
           dragRegion={isTauriRuntime()}
@@ -344,6 +347,8 @@ function SemanticResultCard({
 }) {
   return (
     <button
+      aria-label={result.title || result.relativePath}
+      data-note-card={result.relativePath}
       onClick={() => onSelect(result.relativePath)}
       type="button"
       {...stylex.props(noteListStyles.semanticCard)}

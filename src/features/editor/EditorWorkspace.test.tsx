@@ -1,4 +1,4 @@
-import { cleanup, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "../../domain/settings";
@@ -29,6 +29,52 @@ afterEach(() => {
 });
 
 describe("EditorWorkspace PDF export", () => {
+  it("syncs preview property edits into the source editor and dirty state", async () => {
+    const content = "---\ntitle: Original\ntags: [入门]\naliases: [指南]\n---\n\n# Body";
+    useAppStore.setState({
+      workspaceRoot: "/workspace",
+      notes: [{ relativePath: "alpha.md", fileName: "alpha.md", extension: "md",
+        modifiedMs: 1, size: content.length, title: "Original", tags: ["入门"],
+        excerpt: "", favorite: false }],
+      activePath: "alpha.md",
+      loadedContentPath: "alpha.md",
+      content,
+      savedContent: content,
+      viewMode: "split",
+    });
+    const view = render(<EditorWorkspace isDark={false} onDelete={() => undefined} onRename={() => undefined} />);
+    const user = userEvent.setup();
+    await user.click(await view.findByRole("button", { name: "编辑 title" }));
+    const title = view.getByRole("textbox", { name: "title" });
+    fireEvent.change(title, { target: { value: "新的标题" } });
+    fireEvent.keyDown(title, { key: "Enter", isComposing: true });
+    expect(useAppStore.getState().content).toBe(content);
+    fireEvent.keyDown(title, { key: "Enter" });
+    await waitFor(() => expect(view.container.querySelector(".cm-content")).toHaveTextContent('title: "新的标题"'));
+    expect(useAppStore.getState().savedContent).toBe(content);
+    expect(useAppStore.getState().content).toContain("# Body");
+
+    await user.click(view.getByRole("button", { name: "编辑 tags" }));
+    const tags = view.getByRole("textbox", { name: "tags" });
+    fireEvent.change(tags, { target: { value: "Memoir，MDX" } });
+    fireEvent.blur(tags);
+    await waitFor(() => expect(view.container.querySelector(".cm-content")).toHaveTextContent('tags: ["Memoir","MDX"]'));
+
+    await user.click(view.getByRole("button", { name: "编辑 tags" }));
+    const clearedTags = view.getByRole("textbox", { name: "tags" });
+    fireEvent.change(clearedTags, { target: { value: "" } });
+    fireEvent.keyDown(clearedTags, { key: "Enter" });
+    expect(view.container.querySelector('[data-property-key="tags"]')).toHaveTextContent("空");
+    expect(useAppStore.getState().content).toContain("tags: []");
+
+    await user.click(view.getByRole("button", { name: "编辑 aliases" }));
+    const aliases = view.getByRole("textbox", { name: "aliases" });
+    const beforeCancel = useAppStore.getState().content;
+    fireEvent.change(aliases, { target: { value: "取消修改" } });
+    fireEvent.keyDown(aliases, { key: "Escape" });
+    expect(useAppStore.getState().content).toBe(beforeCancel);
+  });
+
   it("exports the open note from the header button", async () => {
     useAppStore.setState({
       workspaceRoot: "/workspace",

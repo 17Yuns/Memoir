@@ -25,7 +25,7 @@ import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
 import * as runtime from "react/jsx-runtime";
 import { getGateways } from "../../gateways";
-import { Collapsible, Tag } from "../../components/ui";
+import { Tag } from "../../components/ui";
 import type { NoteMeta } from "../../domain/notes";
 import {
   isNoteMarkdownHref,
@@ -36,11 +36,12 @@ import {
 import { decodeMediaHref, noteDirectory, resolveWorkspaceFilePath } from "../../domain/paths";
 import { useNoteGraph } from "../graph/useNoteGraph";
 import { LinkCard } from "./LinkCard";
+import { NoteProperties } from "./NoteProperties";
 import { readLinkCardProp, remarkLinkCards } from "./remark-link-cards";
 import { remarkWikiLinks, wikiInnerFromHref } from "./remark-wiki-links";
 import { useAppStore } from "../../store/app-store";
 import { useI18n } from "../../i18n/react";
-import { parseNoteProperties, stripFrontmatter } from "../library/note-utils";
+import { stripFrontmatter } from "../library/note-utils";
 import { rehypeSourceLines } from "./source-line";
 import { rehypeTaskOffsets, toggleTaskAtOffset } from "./task-list";
 import { accents, colors, typography } from "../../styles/tokens.stylex";
@@ -102,51 +103,6 @@ function Steps({ children }: { children: ReactNode }) {
     <div data-preview-steps="" {...stylex.props(styles.steps)}>
       {children}
     </div>
-  );
-}
-
-function NoteProperties({
-  content,
-  fallbackTitle,
-  fallbackTags,
-}: {
-  content: string;
-  fallbackTitle: string;
-  fallbackTags?: string[];
-}) {
-  const { t } = useI18n();
-  const properties = useMemo(() => {
-    const parsed = parseNoteProperties(content, fallbackTitle);
-    if (parsed.some((property) => property.key === "tags") || !fallbackTags?.length) {
-      return parsed;
-    }
-    return [parsed[0], { key: "tags", values: fallbackTags, kind: "list" as const }, ...parsed.slice(1)];
-  }, [content, fallbackTags, fallbackTitle]);
-  const labels: Record<string, string> = {
-    title: t("properties.title"),
-    tags: t("properties.tags"),
-    aliases: t("properties.aliases"),
-  };
-
-  return (
-    <Collapsible
-      aria-label={t("properties.label")}
-      label={t("properties.label")}
-      style={styles.properties}
-    >
-      <div data-note-properties="">
-        {properties.map((property) => (
-          <div data-property-key={property.key} {...stylex.props(styles.propertyRow)} key={property.key}>
-            <span {...stylex.props(styles.propertyKey)}>{labels[property.key] || property.key}</span>
-            <div {...stylex.props(styles.propertyValue, property.kind === "list" && styles.propertyValueList)}>
-              {property.kind === "list"
-                ? property.values.map((value) => <Tag key={`${property.key}-${value}`}>{value}</Tag>)
-                : property.values[0]}
-            </div>
-          </div>
-        ))}
-      </div>
-    </Collapsible>
   );
 }
 
@@ -456,6 +412,7 @@ export function NotePreviewArticle({
       {!exportMode && (
         <NoteProperties
           content={content}
+          onContentChange={onContentChange}
           fallbackTags={note?.tags}
           fallbackTitle={note?.fileName || "Untitled"}
         />
@@ -522,24 +479,6 @@ const styles = stylex.create({
     color: "#222222",
     backgroundColor: "#ffffff",
   },
-  properties: {
-    marginBottom: 24,
-  },
-  propertyRow: {
-    display: "grid",
-    gridTemplateColumns: "minmax(72px, 24%) minmax(0, 1fr)",
-    gap: 12,
-    minHeight: 44,
-    alignItems: "center",
-    paddingBlock: 8,
-    borderBottomWidth: 1,
-    borderBottomStyle: "solid",
-    borderBottomColor: colors.border,
-    ":last-child": { borderBottomWidth: 0 },
-  },
-  propertyKey: { color: colors.muted, fontSize: 14, overflowWrap: "anywhere" },
-  propertyValue: { minWidth: 0, color: colors.text, fontSize: 14, overflowWrap: "anywhere" },
-  propertyValueList: { display: "flex", flexWrap: "wrap", gap: 6 },
   callout: {
     marginBlock: 20,
     paddingBlock: 12,

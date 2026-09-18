@@ -103,15 +103,13 @@ export function parseNoteProperties(content: string, fallbackTitle: string): Not
   const known = new Set(["title"]);
   for (const key of ["tags", "aliases"]) {
     const values = frontmatterList(data[key]);
-    if (values.length) properties.push({ key, values, kind: "list" });
+    if (values.length || key in data) properties.push({ key, values, kind: "list" });
     known.add(key);
   }
   for (const [key, value] of Object.entries(data)) {
     if (known.has(key)) continue;
     const values = frontmatterValue(value);
-    if (values.length) {
-      properties.push({ key, values, kind: values.length > 1 ? "list" : "text" });
-    }
+    properties.push({ key, values, kind: Array.isArray(value) ? "list" : "text" });
   }
   return properties;
 }

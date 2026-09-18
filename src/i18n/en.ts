@@ -385,6 +385,11 @@ export const en = {
   "properties.title": "title",
   "properties.tags": "tags",
   "properties.aliases": "aliases",
+  "properties.edit": "Edit {name}",
+  "properties.empty": "Empty",
+  "properties.listHint": "Separate values with commas",
+  "properties.editHint": "Enter to save, Esc to cancel",
+  "properties.invalid": "Unable to update property. Check the value and frontmatter format.",
 
   "dialog.newNote": "New note",
   "dialog.newFolder": "New folder",

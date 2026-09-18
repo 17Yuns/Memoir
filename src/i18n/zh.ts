@@ -382,6 +382,11 @@ export const zh = {
   "properties.title": "title",
   "properties.tags": "tags",
   "properties.aliases": "aliases",
+  "properties.edit": "编辑 {name}",
+  "properties.empty": "空",
+  "properties.listHint": "用逗号分隔多个值",
+  "properties.editHint": "Enter 保存，Esc 取消",
+  "properties.invalid": "无法更新属性，请检查属性值和文件头部的格式。",
 
   "dialog.newNote": "新建笔记",
   "dialog.newFolder": "新建文件夹",

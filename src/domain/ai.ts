@@ -65,6 +65,36 @@ export function mergeNoteCitations(
   return merged;
 }
 
+function citationFileName(path: string): string {
+  return path.split(/[\\/]/).pop() || path;
+}
+
+function messageIncludesToken(message: string, token: string): boolean {
+  const trimmed = token.trim();
+  if (!trimmed) return false;
+  const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^\\w./\\\\-])${escaped}([^\\w./\\\\-]|$)`).test(message);
+}
+
+export function messageMentionsCitation(message: string, citation: AiNoteCitation): boolean {
+  const path = citation.path.replaceAll("\\", "/");
+  return messageIncludesToken(message, path) || messageIncludesToken(message, citationFileName(path));
+}
+
+/** Keep notes the reply actually named. Unused search hits are dropped. */
+export function selectUsedNoteCitations(
+  message: string,
+  retrieved: Iterable<AiNoteCitation> | null | undefined,
+  fallback?: AiNoteCitation | null,
+): AiNoteCitation[] {
+  const retrievedNotes = mergeNoteCitations(retrieved);
+  const candidates = mergeNoteCitations(retrievedNotes, fallback ? [fallback] : []);
+  const mentioned = candidates.filter((citation) => messageMentionsCitation(message, citation));
+  if (mentioned.length) return mentioned;
+  if (retrievedNotes.length) return [];
+  return fallback ? mergeNoteCitations([fallback]) : [];
+}
+
 export const AI_CHAT_PROGRESS_EVENT = "ai-chat-progress";
 
 export type AiChatProgress = {

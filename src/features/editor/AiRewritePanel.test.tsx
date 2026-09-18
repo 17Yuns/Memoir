@@ -237,12 +237,17 @@ describe("AiRewritePanel", () => {
     expect(view.getByRole("region", { name: "引用笔记" })).toHaveTextContent("notes.md");
   });
 
-  it("lists retrieved notes after an informational reply", async () => {
+  it("lists only notes named in the reply", async () => {
     const gateways = createMockGateways();
     gateways.workspace.chatResult = {
-      message: "根据检索结果，两数之和在题库里。",
+      message: "题目记在 [工作/秋招/百度笔试.mdx]，并附有 Python 解法。",
       edit: null,
-      citations: [{ path: "LeetCode/two-sum.md", title: "Two Sum" }],
+      citations: [
+        { path: "工作/秋招/秋招投递记录.mdx", title: "秋招投递记录" },
+        { path: "工作/秋招/百度笔试.mdx", title: "百度笔试" },
+        { path: "学习/八股/python.mdx", title: "Python" },
+        { path: "welcome.mdx", title: "欢迎使用 Memoir" },
+      ],
     };
     setGatewaysForTests(gateways);
     const user = userEvent.setup();
@@ -258,10 +263,13 @@ describe("AiRewritePanel", () => {
       />,
     );
 
-    await user.type(view.getByRole("textbox", { name: "输入你的要求" }), "两数之和在哪{enter}");
+    await user.type(view.getByRole("textbox", { name: "输入你的要求" }), "百度笔试{enter}");
     const citations = await view.findByRole("region", { name: "引用笔记" });
-    expect(citations).toHaveTextContent("notes.md");
-    expect(citations).toHaveTextContent("Two Sum · LeetCode/two-sum.md");
+    expect(citations).toHaveTextContent("工作/秋招/百度笔试.mdx");
+    expect(citations).not.toHaveTextContent("秋招投递记录");
+    expect(citations).not.toHaveTextContent("python.mdx");
+    expect(citations).not.toHaveTextContent("welcome.mdx");
+    expect(citations).not.toHaveTextContent("notes.md");
   });
 
   it("does not treat an edit target as a cited note", async () => {

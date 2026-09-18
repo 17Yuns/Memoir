@@ -22,7 +22,7 @@ import { Button, IconButton, PanelHeader } from "../../components/ui";
 import {
   citationTitleFromPath,
   formatNoteCitation,
-  mergeNoteCitations,
+  selectUsedNoteCitations,
   type AiChatMessage,
   type AiChatProgress,
   type AiEditorEdit,
@@ -206,11 +206,12 @@ export function AiRewritePanel({
           reasoning: reply.reasoning,
           activity: reply.activity,
           elapsedMs: Date.now() - (startedAtRef.current ?? Date.now()),
-          citations: mergeNoteCitations(
-            requestTarget && !response.edit
-              ? [{ path: requestTarget.path, title: citationTitleFromPath(requestTarget.path) }]
-              : [],
+          citations: selectUsedNoteCitations(
+            response.message || t("aiRewrite.assistant"),
             response.citations,
+            requestTarget && !response.edit
+              ? { path: requestTarget.path, title: citationTitleFromPath(requestTarget.path) }
+              : null,
           ),
         },
       ]);

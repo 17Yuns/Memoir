@@ -1,6 +1,6 @@
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SETTINGS } from "../../domain/settings";
 import { useAppStore } from "../../store/app-store";
 import { exportNotePdf } from "../export/export-note-pdf";
@@ -9,6 +9,16 @@ import { EditorWorkspace } from "./EditorWorkspace";
 vi.mock("../export/export-note-pdf", () => ({
   exportNotePdf: vi.fn(),
 }));
+
+const PANE_READY_TIMEOUT_MS = 5000;
+
+beforeAll(async () => {
+  // Keep cold module transforms outside waitFor's DOM readiness timeout.
+  await Promise.all([
+    import("./EditorPane"),
+    import("../preview/PreviewPane"),
+  ]);
+});
 
 afterEach(() => {
   cleanup();
@@ -44,13 +54,19 @@ describe("EditorWorkspace PDF export", () => {
     });
     const view = render(<EditorWorkspace isDark={false} onDelete={() => undefined} onRename={() => undefined} />);
     const user = userEvent.setup();
-    await user.click(await view.findByRole("button", { name: "编辑 title" }));
+    await view.findByRole("region", { name: "实时预览" }, { timeout: PANE_READY_TIMEOUT_MS });
+    await user.click(
+      await view.findByRole("button", { name: "编辑 title" }, { timeout: PANE_READY_TIMEOUT_MS }),
+    );
     const title = view.getByRole("textbox", { name: "title" });
     fireEvent.change(title, { target: { value: "新的标题" } });
     fireEvent.keyDown(title, { key: "Enter", isComposing: true });
     expect(useAppStore.getState().content).toBe(content);
     fireEvent.keyDown(title, { key: "Enter" });
-    await waitFor(() => expect(view.container.querySelector(".cm-content")).toHaveTextContent('title: "新的标题"'));
+    await waitFor(
+      () => expect(view.container.querySelector(".cm-content")).toHaveTextContent('title: "新的标题"'),
+      { timeout: PANE_READY_TIMEOUT_MS },
+    );
     expect(useAppStore.getState().savedContent).toBe(content);
     expect(useAppStore.getState().content).toContain("# Body");
 
@@ -58,7 +74,10 @@ describe("EditorWorkspace PDF export", () => {
     const tags = view.getByRole("textbox", { name: "tags" });
     fireEvent.change(tags, { target: { value: "Memoir，MDX" } });
     fireEvent.blur(tags);
-    await waitFor(() => expect(view.container.querySelector(".cm-content")).toHaveTextContent('tags: ["Memoir","MDX"]'));
+    await waitFor(
+      () => expect(view.container.querySelector(".cm-content")).toHaveTextContent('tags: ["Memoir","MDX"]'),
+      { timeout: PANE_READY_TIMEOUT_MS },
+    );
 
     await user.click(view.getByRole("button", { name: "编辑 tags" }));
     const clearedTags = view.getByRole("textbox", { name: "tags" });
@@ -73,7 +92,7 @@ describe("EditorWorkspace PDF export", () => {
     fireEvent.change(aliases, { target: { value: "取消修改" } });
     fireEvent.keyDown(aliases, { key: "Escape" });
     expect(useAppStore.getState().content).toBe(beforeCancel);
-  });
+  }, 15_000);
 
   it("exports the open note from the header button", async () => {
     useAppStore.setState({

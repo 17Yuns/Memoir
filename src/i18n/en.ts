@@ -318,6 +318,7 @@ export const en = {
   "aiRewrite.callingTool": "Calling tool {tool}",
   "aiRewrite.toolCompleted": "Tool {tool} returned",
   "aiRewrite.toolResultCount": "{count} notes matched",
+  "aiRewrite.citations": "Cited notes",
   "aiRewrite.calledModel": "Called {model}",
   "aiRewrite.modelFailed": "Failed to call {model}",
   "aiRewrite.sending": "Sending the editing instruction",

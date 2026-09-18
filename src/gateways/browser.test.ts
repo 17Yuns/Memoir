@@ -203,7 +203,7 @@ describe("BrowserWorkspaceGateway", () => {
     expect(payload.messages).toContainEqual(expect.objectContaining({
       role: "system", content: expect.stringContaining("No editor context is attached"),
     }));
-    expect(result).toEqual({ message: "Hello", edit: null });
+    expect(result).toEqual({ message: "Hello", edit: null, citations: [] });
     fetchMock.mockRestore();
   });
 
@@ -246,6 +246,7 @@ describe("BrowserWorkspaceGateway", () => {
     ).resolves.toEqual({
       message: "Updated it.",
       edit: { tool: "replace_selection", replacement: "  - revised\n" },
+      citations: [],
     });
 
     const [url, init] = fetchMock.mock.calls[0];
@@ -328,7 +329,14 @@ describe("BrowserWorkspaceGateway", () => {
         [{ role: "user", content: "Find Two Sum and revise" }],
         { path: "note.md", from: 0, to: 4, source: "note", scope: "document" },
         (event) => events.push(event),
-      )).resolves.toEqual({ message: "**完成**", edit: { tool: "replace_document", replacement: "# Revised" } });
+      )).resolves.toEqual({
+        message: "**完成**",
+        edit: { tool: "replace_document", replacement: "# Revised" },
+        citations: [
+          { path: "LeetCode/two-sum.md", title: "Two Sum" },
+          { path: "welcome.mdx", title: "Welcome to Memoir" },
+        ],
+      });
       const second = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
       expect(second.stream).toBe(true);
       expect(second.messages).toEqual(expect.arrayContaining([
@@ -366,7 +374,11 @@ describe("BrowserWorkspaceGateway", () => {
       [{ role: "user", content: "Where is the Two Sum note?" }],
       { path: "welcome.mdx", from: 0, to: 1, source: "# Welcome", scope: "document" },
       (event) => progress.push(event.stage),
-    )).resolves.toEqual({ message: "Found it in [LeetCode/two-sum.md].", edit: null });
+    )).resolves.toEqual({
+      message: "Found it in [LeetCode/two-sum.md].",
+      edit: null,
+      citations: [{ path: "LeetCode/two-sum.md", title: "Two Sum" }],
+    });
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const firstBody = JSON.parse(String(fetchMock.mock.calls[0][1]?.body));

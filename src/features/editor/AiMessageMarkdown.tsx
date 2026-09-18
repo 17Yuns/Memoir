@@ -1,9 +1,18 @@
 import { memo } from "react";
 import * as stylex from "@stylexjs/stylex";
 import ReactMarkdown, { type Components } from "react-markdown";
+import rehypeKatex from "rehype-katex";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
 import { getGateways } from "../../gateways";
 import { colors, accents, typography } from "../../styles/tokens.stylex";
+
+const remarkPlugins = [remarkGfm, remarkMath];
+const katex: [typeof rehypeKatex, { throwOnError: false; strict: "ignore" }] = [
+  rehypeKatex,
+  { throwOnError: false, strict: "ignore" },
+];
+const rehypePlugins = [katex];
 
 const components: Components = {
   p: ({ children }) => <p {...stylex.props(styles.paragraph)}>{children}</p>,
@@ -29,8 +38,24 @@ const components: Components = {
   img: ({ alt }) => <span>{alt}</span>,
 };
 
+/** Turn one-line `$$...$$` into a math block so KaTeX uses display mode. */
+export function normalizeAiMath(content: string): string {
+  return content.replace(/^[ \t]*\$\$(?!\$)([^\n]+?)\$\$[ \t]*$/gm, (_, math: string) => `$$\n${math}\n$$`);
+}
+
 export const AiMessageMarkdown = memo(function AiMessageMarkdown({ content }: { content: string }) {
-  return <div {...stylex.props(styles.body)}><ReactMarkdown remarkPlugins={[remarkGfm]} components={components} skipHtml>{content}</ReactMarkdown></div>;
+  return (
+    <div data-ai-message="" {...stylex.props(styles.body)}>
+      <ReactMarkdown
+        components={components}
+        rehypePlugins={rehypePlugins}
+        remarkPlugins={remarkPlugins}
+        skipHtml
+      >
+        {normalizeAiMath(content)}
+      </ReactMarkdown>
+    </div>
+  );
 });
 
 const styles = stylex.create({

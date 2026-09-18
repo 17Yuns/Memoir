@@ -19,12 +19,16 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
 } from "react";
 import { Button, IconButton, PanelHeader } from "../../components/ui";
-import type {
-  AiChatMessage,
-  AiChatProgress,
-  AiEditorEdit,
-  AiRewriteTarget,
-  AiSettings,
+import {
+  citationTitleFromPath,
+  formatNoteCitation,
+  mergeNoteCitations,
+  type AiChatMessage,
+  type AiChatProgress,
+  type AiEditorEdit,
+  type AiNoteCitation,
+  type AiRewriteTarget,
+  type AiSettings,
 } from "../../domain/ai";
 import { mapGatewayError } from "../../domain/errors";
 import { getGateways } from "../../gateways";
@@ -38,7 +42,12 @@ import { AiMessageMarkdown } from "./AiMessageMarkdown";
 import { streamedMessage } from "./ai-stream-preview";
 
 type Activity = { progress: AiChatProgress; elapsedMs: number };
-type ConversationMessage = AiChatMessage & { activity?: Activity[]; reasoning?: string; elapsedMs?: number };
+type ConversationMessage = AiChatMessage & {
+  activity?: Activity[];
+  reasoning?: string;
+  elapsedMs?: number;
+  citations?: AiNoteCitation[];
+};
 type LiveReply = { raw: string; reasoning: string; activity: Activity[] };
 const emptyReply = (): LiveReply => ({ raw: "", reasoning: "", activity: [] });
 
@@ -185,7 +194,19 @@ export function AiRewritePanel({
       if (requestId !== requestIdRef.current) return;
       setMessages([
         ...conversation,
-        { role: "assistant", content: response.message || t("aiRewrite.assistant"), reasoning: reply.reasoning, activity: reply.activity, elapsedMs: Date.now() - (startedAtRef.current ?? Date.now()) },
+        {
+          role: "assistant",
+          content: response.message || t("aiRewrite.assistant"),
+          reasoning: reply.reasoning,
+          activity: reply.activity,
+          elapsedMs: Date.now() - (startedAtRef.current ?? Date.now()),
+          citations: mergeNoteCitations(
+            requestTarget && !response.edit
+              ? [{ path: requestTarget.path, title: citationTitleFromPath(requestTarget.path) }]
+              : [],
+            response.citations,
+          ),
+        },
       ]);
       if (requestTarget && response.edit && response.edit.replacement !== contextTarget.source) {
         setPendingEdit({ ...contextTarget, replacement: response.edit.replacement });
@@ -346,6 +367,7 @@ export function AiRewritePanel({
                 <>
                   <AiReplyDetails reasoning={message.reasoning} activity={message.activity} elapsedMs={message.elapsedMs} />
                   <AiMessageMarkdown content={message.content} />
+                  <AiMessageCitations citations={message.citations} />
                 </>
               ) : <p {...stylex.props(styles.messageContent)}>{message.content}</p>}
             </article>
@@ -499,6 +521,24 @@ export function AiRewritePanel({
         </div>
       </footer>
     </aside>
+  );
+}
+
+function AiMessageCitations({ citations }: { citations?: AiNoteCitation[] }) {
+  const { t } = useI18n();
+  if (!citations?.length) return null;
+  return (
+    <section aria-label={t("aiRewrite.citations")} {...stylex.props(styles.citations)}>
+      <h3 {...stylex.props(styles.citationLabel)}>{t("aiRewrite.citations")}</h3>
+      <ul {...stylex.props(styles.citationList)}>
+        {citations.map((citation) => (
+          <li key={citation.path} title={citation.path} {...stylex.props(styles.citationItem)}>
+            <FileText aria-hidden="true" {...stylex.props(styles.citationIcon)} />
+            <span {...stylex.props(styles.citationText)}>{formatNoteCitation(citation)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -681,6 +721,41 @@ const styles = stylex.create({
     backgroundColor: `color-mix(in srgb, ${colors.panel} 82%, ${colors.elevated})`,
   },
   assistantMessage: { width: "100%" },
+  citations: {
+    display: "grid",
+    gap: "6px",
+    minWidth: 0,
+    marginTop: "4px",
+    paddingTop: "8px",
+    borderTopWidth: "1px",
+    borderTopStyle: "solid",
+    borderTopColor: colors.border,
+  },
+  citationLabel: {
+    margin: 0,
+    color: colors.muted,
+    fontSize: "10px",
+    fontWeight: 650,
+    letterSpacing: 0,
+  },
+  citationList: { display: "grid", gap: "4px", margin: 0, padding: 0, listStyle: "none" },
+  citationItem: {
+    display: "flex",
+    minWidth: 0,
+    alignItems: "flex-start",
+    gap: "6px",
+    color: `color-mix(in srgb, ${colors.text} 78%, ${colors.muted})`,
+    fontSize: "11px",
+    lineHeight: 1.45,
+  },
+  citationIcon: {
+    width: "12px",
+    height: "12px",
+    flex: "none",
+    marginTop: "2px",
+    color: colors.muted,
+  },
+  citationText: { minWidth: 0, overflowWrap: "anywhere" },
   messageAuthor: { color: colors.muted, fontSize: "10px", fontWeight: 650, letterSpacing: 0 },
   messageContent: {
     margin: 0,

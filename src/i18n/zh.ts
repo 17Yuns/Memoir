@@ -315,6 +315,7 @@ export const zh = {
   "aiRewrite.callingTool": "正在调用工具 {tool}",
   "aiRewrite.toolCompleted": "工具 {tool} 已返回",
   "aiRewrite.toolResultCount": "命中 {count} 条笔记",
+  "aiRewrite.citations": "引用笔记",
   "aiRewrite.calledModel": "已调用 {model}",
   "aiRewrite.modelFailed": "调用 {model} 失败",
   "aiRewrite.sending": "正在发送修改要求",

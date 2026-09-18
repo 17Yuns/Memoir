@@ -233,6 +233,59 @@ describe("AiRewritePanel", () => {
 
     expect(await view.findByText("这篇笔记有三个章节。")).toBeInTheDocument();
     expect(view.queryByRole("region", { name: "建议修改" })).not.toBeInTheDocument();
+    expect(view.getByRole("region", { name: "引用笔记" })).toHaveTextContent("notes.md");
+  });
+
+  it("lists retrieved notes after an informational reply", async () => {
+    const gateways = createMockGateways();
+    gateways.workspace.chatResult = {
+      message: "根据检索结果，两数之和在题库里。",
+      edit: null,
+      citations: [{ path: "LeetCode/two-sum.md", title: "Two Sum" }],
+    };
+    setGatewaysForTests(gateways);
+    const user = userEvent.setup();
+    const view = render(
+      <AiRewritePanel
+        onApply={() => true}
+        onClose={() => undefined}
+        onRefreshTarget={() => target}
+        onSave={async () => true}
+        workspaceRoot="/workspace"
+        settings={{ ...DEFAULT_SETTINGS.ai, enabled: true }}
+        target={target}
+      />,
+    );
+
+    await user.type(view.getByRole("textbox", { name: "输入你的要求" }), "两数之和在哪{enter}");
+    const citations = await view.findByRole("region", { name: "引用笔记" });
+    expect(citations).toHaveTextContent("notes.md");
+    expect(citations).toHaveTextContent("Two Sum · LeetCode/two-sum.md");
+  });
+
+  it("does not treat an edit target as a cited note", async () => {
+    const gateways = createMockGateways();
+    gateways.workspace.chatResult = {
+      message: "我准备了一个修改，请先审阅。",
+      edit: { tool: "replace_document", replacement: "修改后的内容" },
+    };
+    setGatewaysForTests(gateways);
+    const user = userEvent.setup();
+    const view = render(
+      <AiRewritePanel
+        onApply={() => true}
+        onClose={() => undefined}
+        onRefreshTarget={() => target}
+        onSave={async () => true}
+        workspaceRoot="/workspace"
+        settings={{ ...DEFAULT_SETTINGS.ai, enabled: true }}
+        target={target}
+      />,
+    );
+
+    await user.type(view.getByRole("textbox", { name: "输入你的要求" }), "润色{enter}");
+    await view.findByRole("region", { name: "建议修改" });
+    expect(view.queryByRole("region", { name: "引用笔记" })).not.toBeInTheDocument();
   });
 
   it("streams Markdown and keeps reasoning and activity out of subsequent prompts", async () => {

@@ -1,8 +1,9 @@
 import { cleanup, render } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
-import { AiMessageMarkdown } from "./AiMessageMarkdown";
+import { AiMessageMarkdown, normalizeAiMath } from "./AiMessageMarkdown";
 
 afterEach(cleanup);
+
 it("renders Markdown tables, lists and code while excluding active HTML", () => {
   const view = render(<AiMessageMarkdown content={'# Heading\n\n- one\n- two\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\n```ts\nconst x = 1;\n```\n\n[safe](https://example.com) [unsafe](javascript:alert(1))\n\n<script>alert(1)</script>\n\n![remote](https://example.com/pixel.png)'} />);
   expect(view.getByRole("heading", { name: "Heading" })).toBeInTheDocument();
@@ -12,4 +13,17 @@ it("renders Markdown tables, lists and code while excluding active HTML", () => 
   expect(view.getByRole("link", { name: "safe" })).toHaveAttribute("rel", "noopener noreferrer");
   expect(view.container.querySelector('a[href^="javascript:"]')).toBeNull();
   expect(view.container.querySelector("script, img")).toBeNull();
+});
+
+it("turns a one-line $$ formula into a math block", () => {
+  expect(normalizeAiMath("$$\\int_0^1 x^2\\,dx$$")).toBe("$$\n\\int_0^1 x^2\\,dx\n$$");
+});
+
+it("renders inline and block math with KaTeX", () => {
+  const view = render(
+    <AiMessageMarkdown content={"Euler: $e^{i\\pi}+1=0$\n\n$$\\int_0^1 x^2\\,dx$$"} />,
+  );
+  expect(view.container.querySelector("[data-ai-message] .katex")).not.toBeNull();
+  expect(view.container.querySelector("[data-ai-message] .katex-display")).not.toBeNull();
+  expect(view.container.textContent).not.toMatch(/\$e\^/);
 });

@@ -183,9 +183,18 @@ pub struct AiEditProposal {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct AiNoteCitation {
+    pub path: String,
+    pub title: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct AiChatResponse {
     pub message: String,
     pub edit: Option<AiEditProposal>,
+    #[serde(default)]
+    pub citations: Vec<AiNoteCitation>,
 }
 
 pub const AI_CHAT_PROGRESS_EVENT: &str = "ai-chat-progress";

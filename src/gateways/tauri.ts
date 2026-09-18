@@ -1,3 +1,4 @@
+import type { AiConversation } from "../domain/ai";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
 import { openPath, openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -226,6 +227,14 @@ export class TauriWorkspaceGateway implements WorkspaceGateway {
 }
 
 export class TauriPersistenceGateway implements PersistenceGateway {
+  loadAiConversations(workspaceRoot: string) {
+    return call<AiConversation[]>("load_ai_conversations", { workspaceRoot });
+  }
+
+  saveAiConversations(workspaceRoot: string, conversations: AiConversation[]) {
+    return call<void>("save_ai_conversations", { workspaceRoot, conversations });
+  }
+
   setLastOpenNote(workspaceRoot: string, relativePath: string | null) {
     return call<void>("set_last_open_note", { workspaceRoot, relativePath });
   }

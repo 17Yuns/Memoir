@@ -1306,3 +1306,31 @@ fn bench_open_vs_create_walk_counts() {
     );
     assert_eq!(create_walks, 0);
 }
+
+#[test]
+fn ai_conversations_persist_across_restarts_and_are_isolated_by_workspace() {
+    let app_data = tempdir().unwrap();
+    let workspace = tempdir().unwrap();
+    let other_workspace = tempdir().unwrap();
+    let root = workspace.path().to_str().unwrap();
+    let other_root = other_workspace.path().to_str().unwrap();
+    let repository = AppDataRepository::new(app_data.path().to_path_buf());
+    let service = AppStateService::new(repository.clone());
+    let conversations = serde_json::from_value::<Vec<crate::domain::AiConversation>>(serde_json::json!([{
+        "id": "conversation-1", "title": "总结一下", "notePath": "notes.md",
+        "createdAt": 1, "updatedAt": 2,
+        "messages": [
+            { "role": "user", "content": "总结一下" },
+            { "role": "assistant", "content": "回复", "reasoning": "思考内容", "elapsedMs": 1500,
+              "activity": [{ "progress": { "stage": "completed" }, "elapsedMs": 1500 }],
+              "citations": [{ "path": "notes.md", "title": "笔记" }] }
+        ]
+    }])).unwrap();
+    assert!(service.load_ai_conversations(root).unwrap().is_empty());
+    service.save_ai_conversations(&format!("{root}/"), &conversations).unwrap();
+    let restarted = AppStateService::new(repository);
+    assert_eq!(restarted.load_ai_conversations(root).unwrap(), conversations);
+    assert!(restarted.load_ai_conversations(other_root).unwrap().is_empty());
+    restarted.save_ai_conversations(root, &[]).unwrap();
+    assert!(restarted.load_ai_conversations(root).unwrap().is_empty());
+}

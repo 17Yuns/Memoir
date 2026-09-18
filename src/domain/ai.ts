@@ -8,6 +8,22 @@ export type AiChatMessage = {
   content: string;
 };
 
+export type AiConversationMessage = AiChatMessage & {
+  activity?: { progress: AiChatProgress; elapsedMs: number }[];
+  reasoning?: string;
+  elapsedMs?: number;
+  citations?: AiNoteCitation[];
+};
+
+export type AiConversation = {
+  id: string;
+  title: string;
+  notePath: string | null;
+  createdAt: number;
+  updatedAt: number;
+  messages: AiConversationMessage[];
+};
+
 export type AiRewriteTarget = {
   path: string;
   from: number;

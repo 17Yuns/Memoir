@@ -6,6 +6,7 @@ mod workspace;
 
 pub use ai::{chat_with_note, get_vector_index_status, index_vector_workspace, semantic_search};
 pub use app_state::{
+    load_ai_conversations, save_ai_conversations,
     delete_draft, drafts_exist, load_app_state, migrate_legacy_state, read_draft, save_preferences,
     set_favorite, set_folder_appearance, set_last_open_note, skip_app_update, write_draft,
 };

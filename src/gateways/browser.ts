@@ -1,3 +1,4 @@
+import type { AiConversation } from "../domain/ai";
 import { readChatCompletion } from "./ai-stream";
 import type { AppState, LegacyStatePayload } from "../domain/app-state";
 import { isPreviewableHttpUrl, LINK_PREVIEW_HTML_LIMIT } from "../domain/link-preview";
@@ -732,6 +733,16 @@ export class BrowserWorkspaceGateway implements WorkspaceGateway {
 }
 
 export class BrowserPersistenceGateway implements PersistenceGateway {
+  private aiConversations = new Map<string, AiConversation[]>();
+
+  async loadAiConversations(workspaceRoot: string) {
+    return structuredClone(this.aiConversations.get(workspaceRoot) ?? []);
+  }
+
+  async saveAiConversations(workspaceRoot: string, conversations: AiConversation[]) {
+    this.aiConversations.set(workspaceRoot, structuredClone(conversations));
+  }
+
   private state = createDefaultState();
   private drafts = new Map<string, string>();
 

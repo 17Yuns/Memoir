@@ -3,7 +3,7 @@ use crate::{
         app_update::{format_version, parse_version},
         cloud_sync::{sanitize_profile, CloudSyncProfile},
         path::{normalize_workspace_key, validate_relative_path},
-        AppError, AppResult, AppSettings, AppState, ErrorCode, FolderAppearance,
+        AiConversation, AppError, AppResult, AppSettings, AppState, ErrorCode, FolderAppearance,
         LegacyStatePayload, MigrationResult, WorkspaceLayout,
     },
     infrastructure::app_data::AppDataRepository,
@@ -29,6 +29,20 @@ impl AppStateService {
 
     pub fn load(&self) -> AppResult<AppState> {
         self.repository.load_state()
+    }
+
+    pub fn load_ai_conversations(&self, workspace_root: &str) -> AppResult<Vec<AiConversation>> {
+        self.repository.load_ai_conversations(&normalize_workspace_key(workspace_root)?)
+    }
+
+    pub fn save_ai_conversations(
+        &self,
+        workspace_root: &str,
+        conversations: &[AiConversation],
+    ) -> AppResult<()> {
+        let normalized = normalize_workspace_key(workspace_root)?;
+        let _guard = self.state_lock.lock().unwrap_or_else(|error| error.into_inner());
+        self.repository.save_ai_conversations(&normalized, conversations)
     }
 
     pub fn set_last_open_note(

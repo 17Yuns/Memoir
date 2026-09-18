@@ -4,6 +4,7 @@ import {
   Check,
   FileDiff,
   FileText,
+  History,
   LoaderCircle,
   Plus,
   RefreshCw,
@@ -24,6 +25,8 @@ import {
   formatNoteCitation,
   selectUsedNoteCitations,
   type AiChatMessage,
+  type AiConversation,
+  type AiConversationMessage,
   type AiChatProgress,
   type AiEditorEdit,
   type AiNoteCitation,
@@ -41,14 +44,10 @@ import { handleWindowDragMouseDown } from "../window/window-drag";
 
 import { AiMessageMarkdown } from "./AiMessageMarkdown";
 import { streamedMessage } from "./ai-stream-preview";
+import { useAiConversationHistory } from "./ai-conversation-history";
+import { AiConversationHistory } from "./AiConversationHistory";
 
 type Activity = { progress: AiChatProgress; elapsedMs: number };
-type ConversationMessage = AiChatMessage & {
-  activity?: Activity[];
-  reasoning?: string;
-  elapsedMs?: number;
-  citations?: AiNoteCitation[];
-};
 type LiveReply = { raw: string; reasoning: string; activity: Activity[] };
 const emptyReply = (): LiveReply => ({ raw: "", reasoning: "", activity: [] });
 
@@ -70,10 +69,14 @@ export function AiRewritePanel({
   onSave: () => Promise<boolean>;
 }) {
   const { t } = useI18n();
+  const { history, conversations, pendingIds, loaded: historyLoaded, error: historyError } = useAiConversationHistory(workspaceRoot);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const notes = useAppStore((state) => state.notes);
   const [contextTarget, setContextTarget] = useState(target);
   const [includeContext, setIncludeContext] = useState(true);
-  const [messages, setMessages] = useState<ConversationMessage[]>([]);
+  const messages = conversations.find((item) => item.id === conversationId)?.messages ?? [];
+  const conversationPending = conversationId !== null && pendingIds.includes(conversationId);
   const [draft, setDraft] = useState("");
   const [pendingEdit, setPendingEdit] = useState<AiEditorEdit | null>(null);
   const [error, setError] = useState("");
@@ -93,7 +96,8 @@ export function AiRewritePanel({
     requestIdRef.current += 1;
     setContextTarget(target);
     setIncludeContext(true);
-    setMessages([]);
+    setConversationId(null);
+    setHistoryOpen(false);
     setDraft("");
     setPendingEdit(null);
     setError("");
@@ -106,7 +110,7 @@ export function AiRewritePanel({
     return () => {
       requestIdRef.current += 1;
     };
-  }, [target]);
+  }, [target, workspaceRoot]);
 
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -152,7 +156,7 @@ export function AiRewritePanel({
 
   const send = async () => {
     const prompt = draft.trim();
-    if (!prompt || loading || !contextTarget) return;
+    if (!prompt || loading || conversationPending || !contextTarget || !workspaceRoot || !historyLoaded) return;
     const userMessage: AiChatMessage = { role: "user", content: prompt };
     const conversation = [...messages, userMessage];
     const requestMessages = conversation.map(({ role, content }) => ({ role, content }));
@@ -167,7 +171,19 @@ export function AiRewritePanel({
         }
       : contextTarget;
     const requestId = ++requestIdRef.current;
-    setMessages(conversation);
+    const id = conversationId ?? crypto.randomUUID();
+    const previous = conversations.find((item) => item.id === id);
+    const startedAt = Date.now();
+    history.put({
+      id,
+      title: previous?.title ?? prompt.replace(/\s+/g, " ").slice(0, 60),
+      notePath: previous?.notePath ?? contextTarget.path,
+      createdAt: previous?.createdAt ?? startedAt,
+      updatedAt: startedAt,
+      messages: conversation,
+    });
+    setConversationId(id);
+    history.setPending(id, true);
     setDraft("");
     setError("");
     setNotice("");
@@ -176,36 +192,34 @@ export function AiRewritePanel({
     setElapsedMs(0);
     setProgress({ stage: "preparing" });
     try {
-      if (!workspaceRoot) return;
       const response = await getGateways().workspace.chatWithNote(
         workspaceRoot,
         settings,
         requestMessages,
         requestTarget,
         (nextProgress) => {
-          if (requestId !== requestIdRef.current) return;
-          setProgress(nextProgress);
           // Tool rounds have separate envelopes; preview only the current answer.
           const raw = nextProgress.stage === "callingTool" || nextProgress.stage === "generating"
             ? "" : reply.raw + (nextProgress.contentDelta ?? "");
           const previous = reply.activity[reply.activity.length - 1]?.progress;
           const changed = previous?.stage !== nextProgress.stage || previous?.tool !== nextProgress.tool || previous?.query !== nextProgress.query;
           const activity = changed
-            ? [...reply.activity, { progress: { ...nextProgress, contentDelta: undefined, reasoningDelta: undefined }, elapsedMs: Date.now() - (startedAtRef.current ?? Date.now()) }]
+            ? [...reply.activity, { progress: { ...nextProgress, contentDelta: undefined, reasoningDelta: undefined }, elapsedMs: Date.now() - startedAt }]
             : reply.activity;
           reply = { raw, reasoning: reply.reasoning + (nextProgress.reasoningDelta ?? ""), activity };
+          if (requestId !== requestIdRef.current) return;
+          setProgress(nextProgress);
           setLive(reply);
         },
       );
-      if (requestId !== requestIdRef.current) return;
-      setMessages([
+      const completedMessages: AiConversationMessage[] = [
         ...conversation,
         {
           role: "assistant",
           content: response.message || t("aiRewrite.assistant"),
           reasoning: reply.reasoning,
           activity: reply.activity,
-          elapsedMs: Date.now() - (startedAtRef.current ?? Date.now()),
+          elapsedMs: Date.now() - startedAt,
           citations: selectUsedNoteCitations(
             response.message || t("aiRewrite.assistant"),
             response.citations,
@@ -214,7 +228,9 @@ export function AiRewritePanel({
               : null,
           ),
         },
-      ]);
+      ];
+      history.complete(id, completedMessages);
+      if (requestId !== requestIdRef.current) return;
       if (requestTarget && response.edit && response.edit.replacement !== contextTarget.source) {
         setPendingEdit({ ...contextTarget, replacement: response.edit.replacement });
       }
@@ -228,6 +244,7 @@ export function AiRewritePanel({
         }));
       }
     } finally {
+      history.setPending(id, false);
       if (requestId === requestIdRef.current) {
         setLoading(false);
         startedAtRef.current = null;
@@ -259,7 +276,8 @@ export function AiRewritePanel({
 
   const startNewConversation = () => {
     requestIdRef.current += 1;
-    setMessages([]);
+    setConversationId(null);
+    setHistoryOpen(false);
     setDraft("");
     setPendingEdit(null);
     setError("");
@@ -271,6 +289,12 @@ export function AiRewritePanel({
     startedAtRef.current = null;
     const nextTarget = onRefreshTarget();
     if (nextTarget) setContextTarget(nextTarget);
+  };
+
+  const openConversation = (conversation: AiConversation) => {
+    startNewConversation();
+    setConversationId(conversation.id);
+    followScrollRef.current = true;
   };
 
   const applyPendingEdit = async (save: boolean) => {
@@ -300,37 +324,42 @@ export function AiRewritePanel({
     else setError(t("aiRewrite.saveFailed"));
   };
 
-  if (!contextTarget) {
-    return (
-      <aside
-        aria-label={t("aiRewrite.title")}
-        data-ai-rewrite-panel=""
-        {...stylex.props(styles.panel)}
-      >
-        <AiPanelHeader
-          onNewConversation={startNewConversation}
-          onRefresh={refreshContext}
-        />
-        <div {...stylex.props(styles.empty)}>
-          <Sparkles {...stylex.props(styles.emptyIcon)} />
-          <h3 {...stylex.props(styles.emptyTitle)}>{t("aiRewrite.emptyTitle")}</h3>
-          <p {...stylex.props(styles.emptyDescription)}>{t("aiRewrite.emptyDescription")}</p>
-        </div>
-      </aside>
-    );
-  }
-
   return (
     <aside
       aria-label={t("aiRewrite.title")}
       data-ai-rewrite-panel=""
       {...stylex.props(styles.panel)}
     >
-      <AiPanelHeader
-        onNewConversation={startNewConversation}
-        onRefresh={refreshContext}
-      />
+      <div>
+        <AiPanelHeader
+          onNewConversation={startNewConversation}
+          onRefresh={refreshContext}
+          historyOpen={historyOpen}
+          onHistory={() => setHistoryOpen((open) => !open)}
+        />
+        {historyError && <div role="alert" {...stylex.props(styles.error)}>
+          {t(historyError === "load" ? "aiRewrite.historyLoadFailed" : "aiRewrite.historySaveFailed")}
+          <Button size="sm" variant="ghost" onClick={() => void history.retry()}>{t("aiRewrite.historyRetry")}</Button>
+        </div>}
+      </div>
 
+      {historyOpen ? (
+        <AiConversationHistory conversations={conversations} activeId={conversationId}
+          loading={Boolean(workspaceRoot) && !historyLoaded && !historyError} onOpen={openConversation}
+          onDelete={(id) => {
+            history.remove(id);
+            if (conversationId === id) {
+              startNewConversation();
+              setHistoryOpen(true);
+            }
+          }} />
+      ) : !contextTarget && !messages.length ? (
+        <div {...stylex.props(styles.empty)}>
+          <Sparkles {...stylex.props(styles.emptyIcon)} />
+          <h3 {...stylex.props(styles.emptyTitle)}>{t("aiRewrite.emptyTitle")}</h3>
+          <p {...stylex.props(styles.emptyDescription)}>{t("aiRewrite.emptyDescription")}</p>
+        </div>
+      ) : (
       <div ref={scrollRef} onScroll={() => {
         const scroll = scrollRef.current;
         if (scroll) followScrollRef.current = scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight < 64;
@@ -379,6 +408,7 @@ export function AiRewritePanel({
               ) : <p {...stylex.props(styles.messageContent)}>{message.content}</p>}
             </article>
           ))}
+          {conversationPending && !loading && <p role="status" {...stylex.props(styles.loadingMessage)}>{t("aiRewrite.generating")}</p>}
           {(loading || (error && live.activity.length > 0)) && (
             <article {...stylex.props(styles.message, styles.assistantMessage)}>
               <span {...stylex.props(styles.messageAuthor)}>{t("aiRewrite.assistant")}</span>
@@ -475,13 +505,14 @@ export function AiRewritePanel({
           </section>
         )}
       </div>
+      )}
 
-      <footer {...stylex.props(styles.footer)}>
+      {!historyOpen && contextTarget && <footer {...stylex.props(styles.footer)}>
         <div {...stylex.props(styles.composer)}>
           <textarea
             autoFocus
             aria-label={t("aiRewrite.instruction")}
-            disabled={loading}
+            disabled={loading || conversationPending}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleDraftKeyDown}
             placeholder={t("aiRewrite.placeholder")}
@@ -511,7 +542,7 @@ export function AiRewritePanel({
             </Button>
             <Button
               aria-label={loading ? t("aiRewrite.generating") : t("aiRewrite.generate")}
-              disabled={loading || !draft.trim()}
+              disabled={loading || conversationPending || !draft.trim() || !historyLoaded || !workspaceRoot}
               onClick={() => void send()}
               size="icon"
               style={styles.sendButton}
@@ -526,7 +557,7 @@ export function AiRewritePanel({
             </Button>
           </div>
         </div>
-      </footer>
+      </footer>}
     </aside>
   );
 }
@@ -621,9 +652,13 @@ function AiProgressStatus({
 function AiPanelHeader({
   onNewConversation,
   onRefresh,
+  onHistory,
+  historyOpen,
 }: {
   onNewConversation: () => void;
   onRefresh: () => void;
+  onHistory: () => void;
+  historyOpen: boolean;
 }) {
   const { t } = useI18n();
   return (
@@ -634,6 +669,9 @@ function AiPanelHeader({
       style={styles.header}
       actions={
         <>
+          <IconButton label={t("aiRewrite.history")} onClick={onHistory} active={historyOpen} style={styles.headerButton}>
+            <History {...stylex.props(styles.headerIcon)} />
+          </IconButton>
           <IconButton label={t("aiRewrite.refreshContext")} onClick={onRefresh} style={styles.headerButton}>
             <RefreshCw {...stylex.props(styles.headerIcon)} />
           </IconButton>

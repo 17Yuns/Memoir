@@ -410,7 +410,7 @@ describe("NoteList", () => {
     expect(view.getByDisplayValue("https://dav.example/dav")).toBeInTheDocument();
   });
 
-  it("shows AI editing in the library panel", () => {
+  it("shows AI editing in the library panel", async () => {
     useAppStore.setState({
       workspaceRoot: "/workspace",
       libraryPanelMode: "ai",
@@ -435,7 +435,7 @@ describe("NoteList", () => {
       />,
     );
 
-    expect(view.getByRole("button", { name: "引用当前笔记" })).toHaveTextContent("alpha");
+    expect(await view.findByRole("button", { name: "引用当前笔记" })).toHaveTextContent("alpha");
     expect(view.queryByRole("button", { name: "笔记" })).not.toBeInTheDocument();
   });
 

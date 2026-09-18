@@ -1,7 +1,7 @@
 use crate::{
     domain::{
         cloud_sync::{SyncSnapshot, CLOUD_SYNC_SNAPSHOT_VERSION},
-        AppError, AppResult, AppState, LegacyDraft, APP_STATE_VERSION,
+        AiConversation, AppError, AppResult, AppState, LegacyDraft, APP_STATE_VERSION,
     },
     infrastructure::atomic::atomic_write,
 };
@@ -49,6 +49,30 @@ impl AppDataRepository {
         state.version = APP_STATE_VERSION;
         let bytes = serde_json::to_vec_pretty(&state).map_err(AppError::serialization)?;
         atomic_write(&self.state_path(), &bytes)
+    }
+
+    pub fn load_ai_conversations(&self, workspace_root: &str) -> AppResult<Vec<AiConversation>> {
+        let path = self.ai_conversations_path(workspace_root);
+        if !path.exists() {
+            return Ok(Vec::new());
+        }
+        let bytes = fs::read(&path)
+            .map_err(|error| AppError::io("Read AI conversations", &path, error))?;
+        serde_json::from_slice(&bytes).map_err(AppError::serialization)
+    }
+
+    pub fn save_ai_conversations(
+        &self,
+        workspace_root: &str,
+        conversations: &[AiConversation],
+    ) -> AppResult<()> {
+        let bytes = serde_json::to_vec(conversations).map_err(AppError::serialization)?;
+        atomic_write(&self.ai_conversations_path(workspace_root), &bytes)
+    }
+
+    fn ai_conversations_path(&self, workspace_root: &str) -> PathBuf {
+        self.root.join("ai-conversations")
+            .join(format!("{}.json", stable_hash(workspace_root.as_bytes())))
     }
 
     pub fn read_draft(

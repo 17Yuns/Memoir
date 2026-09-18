@@ -8,6 +8,7 @@ mod tray;
 mod window_frame;
 
 use commands::{
+    load_ai_conversations, save_ai_conversations,
     rename_folder, delete_folder, chat_with_note, check_app_update, create_folder, create_note, delete_attachment, delete_draft,
     delete_note, drafts_exist, fetch_link_preview_html, get_cloud_sync_profile, get_index_info,
     get_note_graph, get_vector_index_status, import_attachment, index_vector_workspace,
@@ -82,6 +83,8 @@ pub fn run() {
             import_attachment,
             delete_attachment,
             load_app_state,
+            load_ai_conversations,
+            save_ai_conversations,
             set_last_open_note,
             check_app_update,
             skip_app_update,

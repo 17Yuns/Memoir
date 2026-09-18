@@ -13,7 +13,7 @@ import type {
   RenamedNote,
 } from "../domain/notes";
 import type { AppSettings } from "../domain/settings";
-import type { AiChatMessage, AiChatProgress, AiChatResponse, AiRewriteTarget } from "../domain/ai";
+import type { AiChatMessage, AiChatProgress, AiChatResponse, AiConversation, AiRewriteTarget } from "../domain/ai";
 import type { AiSettings, SemanticSearchResult, VectorIndexStatus } from "../domain/vector-index";
 import type {
   CloudSyncProbe,
@@ -91,6 +91,8 @@ export type SystemGateway = Pick<
 >;
 
 export interface PersistenceGateway {
+  loadAiConversations(workspaceRoot: string): Promise<AiConversation[]>;
+  saveAiConversations(workspaceRoot: string, conversations: AiConversation[]): Promise<void>;
   loadAppState(): Promise<AppState>;
   setLastOpenNote(workspaceRoot: string, relativePath: string | null): Promise<void>;
   savePreferences(

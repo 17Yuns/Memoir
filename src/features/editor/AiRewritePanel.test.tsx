@@ -373,3 +373,98 @@ describe("AiRewritePanel", () => {
     expect(await view.findByText("完成")).toBeInTheDocument();
   });
 });
+
+describe("AI conversation history", () => {
+  function panel(root = "/workspace", currentTarget: typeof target | null = target) {
+    return <AiRewritePanel onApply={() => true} onClose={() => undefined}
+      onRefreshTarget={() => currentTarget} onSave={async () => true} workspaceRoot={root}
+      settings={{ ...DEFAULT_SETTINGS.ai, enabled: true }} target={currentTarget} />;
+  }
+
+  it("reopens saved conversations after remount and continues with their messages", async () => {
+    const gateways = createMockGateways();
+    gateways.workspace.chatResult = { message: "历史回答", edit: null };
+    setGatewaysForTests(gateways);
+    const user = userEvent.setup();
+    const first = render(panel());
+    await user.type(first.getByRole("textbox"), "最初的问题{enter}");
+    await first.findByText("历史回答");
+    await user.click(first.getByRole("button", { name: "新对话" }));
+    expect(first.queryByText("历史回答")).not.toBeInTheDocument();
+    first.unmount();
+
+    const view = render(panel());
+    await user.click(view.getByRole("button", { name: "历史对话" }));
+    await user.click(view.getByRole("button", { name: /最初的问题 notes.md/ }));
+    expect(view.getByText("历史回答")).toBeInTheDocument();
+    expect(view.getByRole("region", { name: "引用笔记" })).toHaveTextContent("notes.md");
+    gateways.workspace.chatResult = { message: "接着回答", edit: null };
+    await user.type(view.getByRole("textbox"), "继续{enter}");
+    await view.findByText("接着回答");
+    expect(gateways.workspace.chatCalls[1].messages).toEqual([
+      { role: "user", content: "最初的问题" },
+      { role: "assistant", content: "历史回答" },
+      { role: "user", content: "继续" },
+    ]);
+    await waitFor(async () => expect((await gateways.persistence.loadAiConversations("/workspace"))[0].messages).toHaveLength(4));
+  });
+
+  it("keeps workspace histories separate and allows reading and deleting without an open note", async () => {
+    const gateways = createMockGateways();
+    gateways.workspace.chatResult = { message: "已有回答", edit: null };
+    setGatewaysForTests(gateways);
+    const user = userEvent.setup();
+    const view = render(panel());
+    await user.type(view.getByRole("textbox"), "已有问题{enter}");
+    await view.findByText("已有回答");
+    view.rerender(panel("/other"));
+    await user.click(view.getByRole("button", { name: "历史对话" }));
+    expect(await view.findByText("还没有历史对话，发送消息后会自动保存。")).toBeInTheDocument();
+    view.rerender(panel("/workspace", null));
+    await user.click(view.getByRole("button", { name: "历史对话" }));
+    await user.click(view.getByRole("button", { name: /已有问题 notes.md/ }));
+    expect(view.getByText("已有回答")).toBeInTheDocument();
+    expect(view.queryByRole("textbox")).not.toBeInTheDocument();
+    await user.click(view.getByRole("button", { name: "历史对话" }));
+    await user.click(view.getByRole("button", { name: "删除对话：已有问题" }));
+    await user.click(view.getByRole("button", { name: "确认删除" }));
+    expect(view.getByText("还没有历史对话，发送消息后会自动保存。")).toBeInTheDocument();
+    await waitFor(async () => expect(await gateways.persistence.loadAiConversations("/workspace")).toEqual([]));
+  });
+
+  it("saves a late reply to its original conversation without polluting a new conversation", async () => {
+    const gateways = createMockGateways();
+    let finish!: (value: typeof gateways.workspace.chatResult) => void;
+    gateways.workspace.chatWithNote = vi.fn(() => new Promise<typeof gateways.workspace.chatResult>((resolve) => { finish = resolve; }));
+    setGatewaysForTests(gateways);
+    const user = userEvent.setup();
+    const view = render(panel());
+    await user.type(view.getByRole("textbox"), "等待回复{enter}");
+    await user.click(view.getByRole("button", { name: "新对话" }));
+    await act(async () => finish({ message: "迟到的回答", edit: { tool: "replace_document", replacement: "不应显示的修改" } }));
+    expect(view.queryByText("迟到的回答")).not.toBeInTheDocument();
+    expect(view.queryByRole("region", { name: "建议修改" })).not.toBeInTheDocument();
+    await user.click(view.getByRole("button", { name: "历史对话" }));
+    await user.click(view.getByRole("button", { name: /等待回复 notes.md/ }));
+    expect(view.getByText("迟到的回答")).toBeInTheDocument();
+    expect(view.queryByRole("region", { name: "建议修改" })).not.toBeInTheDocument();
+  });
+
+  it("prevents overlapping requests when reopening a conversation that is still receiving a reply", async () => {
+    const gateways = createMockGateways();
+    let finish!: (value: typeof gateways.workspace.chatResult) => void;
+    gateways.workspace.chatWithNote = vi.fn(() => new Promise<typeof gateways.workspace.chatResult>((resolve) => { finish = resolve; }));
+    setGatewaysForTests(gateways);
+    const user = userEvent.setup();
+    const first = render(panel());
+    await user.type(first.getByRole("textbox"), "继续等待{enter}");
+    first.unmount();
+    const view = render(panel());
+    await user.click(view.getByRole("button", { name: "历史对话" }));
+    await user.click(view.getByRole("button", { name: /继续等待 notes.md/ }));
+    expect(view.getByRole("textbox")).toBeDisabled();
+    await act(async () => finish({ message: "最终回复", edit: null }));
+    expect(view.getByText("最终回复")).toBeInTheDocument();
+    expect(view.getByRole("textbox")).toBeEnabled();
+  });
+});

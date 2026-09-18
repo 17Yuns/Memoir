@@ -1,3 +1,4 @@
+import type { AiConversation } from "../domain/ai";
 import type { AppState } from "../domain/app-state";
 import { GatewayError } from "../domain/errors";
 import type { AppUpdateCheck } from "../domain/app-update";
@@ -345,6 +346,16 @@ export class MockWorkspaceGateway implements WorkspaceGateway {
 }
 
 export class MockPersistenceGateway implements PersistenceGateway {
+  private aiConversations = new Map<string, AiConversation[]>();
+
+  async loadAiConversations(workspaceRoot: string) {
+    return structuredClone(this.aiConversations.get(workspaceRoot) ?? []);
+  }
+
+  async saveAiConversations(workspaceRoot: string, conversations: AiConversation[]) {
+    this.aiConversations.set(workspaceRoot, structuredClone(conversations));
+  }
+
   async setLastOpenNote(workspaceRoot: string, relativePath: string | null) {
     const notes = { ...this.state.lastOpenNotes };
     if (relativePath === null) delete notes[workspaceRoot];

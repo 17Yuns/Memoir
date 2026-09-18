@@ -1,7 +1,7 @@
 use super::AppServices;
 use crate::{
     domain::{
-        AppError, AppSettings, AppState, FolderAppearance, LegacyStatePayload, MigrationResult,
+        AiConversation, AppError, AppSettings, AppState, FolderAppearance, LegacyStatePayload, MigrationResult,
         WorkspaceLayout,
     },
     tray::ClosePolicy,
@@ -124,4 +124,21 @@ pub fn migrate_legacy_state(
     payload: LegacyStatePayload,
 ) -> Result<MigrationResult, AppError> {
     services.app_state.migrate_legacy_state(payload)
+}
+
+#[tauri::command]
+pub fn load_ai_conversations(
+    services: State<'_, AppServices>,
+    workspace_root: String,
+) -> Result<Vec<AiConversation>, AppError> {
+    services.app_state.load_ai_conversations(&workspace_root)
+}
+
+#[tauri::command]
+pub fn save_ai_conversations(
+    services: State<'_, AppServices>,
+    workspace_root: String,
+    conversations: Vec<AiConversation>,
+) -> Result<(), AppError> {
+    services.app_state.save_ai_conversations(&workspace_root, &conversations)
 }

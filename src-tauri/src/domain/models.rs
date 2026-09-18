@@ -166,6 +166,39 @@ pub struct AiChatMessage {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct AiConversation {
+    pub id: String,
+    pub title: String,
+    pub note_path: Option<String>,
+    pub created_at: u64,
+    pub updated_at: u64,
+    pub messages: Vec<AiConversationMessage>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AiConversationMessage {
+    pub role: String,
+    pub content: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elapsed_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub activity: Option<Vec<AiConversationActivity>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub citations: Option<Vec<AiNoteCitation>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AiConversationActivity {
+    pub progress: AiChatProgress,
+    pub elapsed_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct AiRewriteTarget {
     pub path: String,
     pub from: u64,

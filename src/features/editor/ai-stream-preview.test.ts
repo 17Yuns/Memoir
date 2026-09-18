@@ -13,3 +13,12 @@ describe("streamed message preview", () => {
     expect(streamedMessage('{"mes')).toBe("");
   });
 });
+
+it("hides DSML in the message even when the marker arrives in separate chunks", () => {
+  for (const marker of ["<", "<|", "<|D", "<|DS", "<|DSM", "<|DSML", "<|DSML|tool_calls>", "<｜DSML｜invoke name=", "< | DSML | tool_calls>"]) {
+    const raw = JSON.stringify({ message: `准备修改。\n${marker}`, edit: null });
+    expect(streamedMessage(raw)).toBe("准备修改。");
+  }
+  expect(streamedMessage(JSON.stringify({ message: "正常回答中的 DSML 字样和 <em>HTML</em>。", edit: null })))
+    .toBe("正常回答中的 DSML 字样和 <em>HTML</em>。");
+});

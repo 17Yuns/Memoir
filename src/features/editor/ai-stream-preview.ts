@@ -1,5 +1,13 @@
 /** Read only a top-level message string. Never preview the edit envelope/source. */
 export function streamedMessage(raw: string): string {
+  const message = readStreamedMessage(raw);
+  // Hide leaked provider syntax, including a marker split across stream chunks.
+  const marker = /<\s*\/?\s*[|｜]\s*DSML\b/i.exec(message);
+  if (marker) return message.slice(0, marker.index).trimEnd();
+  return message.replace(/<\s*(?:[|｜]\s*(?:D(?:S(?:M(?:L)?)?)?)?)?$/i, "").trimEnd();
+}
+
+function readStreamedMessage(raw: string): string {
   const text = raw.trimStart().replace(/^```(?:json)?\s*\n/i, "");
   if (!text.startsWith("{")) return "";
   let depth = 0;

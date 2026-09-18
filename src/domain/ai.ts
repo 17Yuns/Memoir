@@ -48,6 +48,11 @@ export type AiChatResponse = {
   citations?: AiNoteCitation[];
 };
 
+/** Provider tool syntax leaked into content is not a user-facing answer or an executable edit. */
+export function hasUnsupportedAiToolMarkup(content: string): boolean {
+  return /<\s*\/?\s*[|｜]\s*DSML\b/i.test(content);
+}
+
 export function citationTitleFromPath(path: string): string {
   const file = path.split(/[\\/]/).pop() || path;
   return file.replace(/\.(mdx|md)$/i, "") || path;

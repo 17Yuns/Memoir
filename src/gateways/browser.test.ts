@@ -399,3 +399,79 @@ describe("BrowserWorkspaceGateway", () => {
     fetchMock.mockRestore();
   });
 });
+
+const leakedEdit = '已添加。\n<|DSML|tool_calls>\n<|DSML|invoke name="replace_selection">\n<|DSML|parameter name="replacement" string="true">27. 原有记录\n28. 网易 笔试 [[网易笔试]]</|DSML|parameter>\n</|DSML|invoke>\n</|DSML|tool_calls>';
+const selectionTarget = { path: "note.md", from: 5, to: 13, source: "27. 原有记录", scope: "selection" as const };
+
+describe("AI tool markup recovery", () => {
+  it.each([
+    leakedEdit,
+    leakedEdit.split("|").join("｜"),
+    leakedEdit.split("|").join(" | "),
+    JSON.stringify({ message: leakedEdit, edit: null }),
+  ])("recovers a leaked edit as a validated proposal, not a claimed file write", async (content) => {
+    const replacement = "27. 原有记录\n28. 网易 笔试 [[网易笔试]]";
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ choices: [{ message: { content } }] }))
+      .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: JSON.stringify({
+        message: "已准备修改，请审阅后应用。", edit: { tool: "replace_selection", replacement },
+      }) } }] }));
+    try {
+      const gateway = new BrowserWorkspaceGateway();
+      const progress = vi.fn();
+      const result = await gateway.chatWithNote("demo://memoir", DEFAULT_SETTINGS.ai,
+        [{ role: "user", content: "追加网易笔试记录" }], selectionTarget, progress);
+      expect(result).toEqual({ message: "已准备修改，请审阅后应用。", edit: { tool: "replace_selection", replacement }, citations: [] });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const repair = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+      expect(repair.tools).toBeUndefined();
+      expect(repair.messages.at(-1)).toMatchObject({ role: "system", content: expect.stringContaining("No edit was applied") });
+      expect(repair.messages.at(-1).content).toContain('"tool":"replace_selection"');
+      expect(repair.messages).toContainEqual({ role: "user", content: expect.stringContaining("27. 原有记录") });
+      expect(progress).toHaveBeenCalledWith(expect.objectContaining({ stage: "generating" }));
+    } finally { fetchMock.mockRestore(); }
+  });
+
+  it.each([
+    leakedEdit,
+    "已修改成功。",
+    '{"message":"完成","edit":{"tool":"replace_document","replacement":"错误的范围"}}',
+    '{"message":"完成","edit":{"tool":"replace_selection","replacement":"未完成',
+  ])("stops after one failed repair and never returns raw tool markup", async (retry) => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: leakedEdit } }] }))
+      .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: retry } }] }));
+    try {
+      await expect(new BrowserWorkspaceGateway().chatWithNote("demo://memoir", DEFAULT_SETTINGS.ai,
+        [{ role: "user", content: "追加记录" }], selectionTarget)).rejects.toMatchObject({ code: "serialization" });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally { fetchMock.mockRestore(); }
+  });
+
+  it("allows tool markup as literal replacement source inside a valid envelope", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(Response.json({ choices: [{ message: {
+      content: JSON.stringify({ message: "文档示例待审阅。", edit: { tool: "replace_selection", replacement: leakedEdit } }),
+    } }] }));
+    try {
+      const result = await new BrowserWorkspaceGateway().chatWithNote("demo://memoir", DEFAULT_SETTINGS.ai,
+        [{ role: "user", content: "添加一个协议示例" }], selectionTarget);
+      expect(result.edit?.replacement).toBe(leakedEdit);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally { fetchMock.mockRestore(); }
+  });
+
+  it("keeps edits disabled during recovery without an attached note", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: leakedEdit } }] }))
+      .mockResolvedValueOnce(Response.json({ choices: [{ message: { content: JSON.stringify({
+        message: "请先引用笔记，当前没有修改。", edit: { tool: "replace_selection", replacement: "不能应用" },
+      }) } }] }));
+    try {
+      const result = await new BrowserWorkspaceGateway().chatWithNote("demo://memoir", DEFAULT_SETTINGS.ai,
+        [{ role: "user", content: "追加记录" }], null);
+      expect(result.edit).toBeNull();
+      const repair = JSON.parse(String(fetchMock.mock.calls[1][1]?.body));
+      expect(repair.messages.at(-1).content).toContain("Return edit: null");
+    } finally { fetchMock.mockRestore(); }
+  });
+});

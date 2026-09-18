@@ -395,7 +395,7 @@ describe("AI conversation history", () => {
 
     const view = render(panel());
     await user.click(view.getByRole("button", { name: "历史对话" }));
-    await user.click(view.getByRole("button", { name: /最初的问题 notes.md/ }));
+    await user.click(view.getByRole("button", { name: /最初的问题.*notes.md/ }));
     expect(view.getByText("历史回答")).toBeInTheDocument();
     expect(view.getByRole("region", { name: "引用笔记" })).toHaveTextContent("notes.md");
     gateways.workspace.chatResult = { message: "接着回答", edit: null };
@@ -422,9 +422,9 @@ describe("AI conversation history", () => {
     expect(await view.findByText("还没有历史对话，发送消息后会自动保存。")).toBeInTheDocument();
     view.rerender(panel("/workspace", null));
     await user.click(view.getByRole("button", { name: "历史对话" }));
-    await user.click(view.getByRole("button", { name: /已有问题 notes.md/ }));
+    await user.click(view.getByRole("button", { name: /已有问题.*notes.md/ }));
     expect(view.getByText("已有回答")).toBeInTheDocument();
-    expect(view.queryByRole("textbox")).not.toBeInTheDocument();
+    expect(view.getByRole("textbox")).toBeInTheDocument();
     await user.click(view.getByRole("button", { name: "历史对话" }));
     await user.click(view.getByRole("button", { name: "删除对话：已有问题" }));
     await user.click(view.getByRole("button", { name: "确认删除" }));
@@ -445,9 +445,9 @@ describe("AI conversation history", () => {
     expect(view.queryByText("迟到的回答")).not.toBeInTheDocument();
     expect(view.queryByRole("region", { name: "建议修改" })).not.toBeInTheDocument();
     await user.click(view.getByRole("button", { name: "历史对话" }));
-    await user.click(view.getByRole("button", { name: /等待回复 notes.md/ }));
+    await user.click(view.getByRole("button", { name: /等待回复.*notes.md/ }));
     expect(view.getByText("迟到的回答")).toBeInTheDocument();
-    expect(view.queryByRole("region", { name: "建议修改" })).not.toBeInTheDocument();
+    expect(view.getByRole("region", { name: "建议修改" })).toHaveTextContent("不应显示的修改");
   });
 
   it("prevents overlapping requests when reopening a conversation that is still receiving a reply", async () => {
@@ -461,10 +461,101 @@ describe("AI conversation history", () => {
     first.unmount();
     const view = render(panel());
     await user.click(view.getByRole("button", { name: "历史对话" }));
-    await user.click(view.getByRole("button", { name: /继续等待 notes.md/ }));
+    await user.click(view.getByRole("button", { name: /继续等待.*notes.md/ }));
     expect(view.getByRole("textbox")).toBeDisabled();
     await act(async () => finish({ message: "最终回复", edit: null }));
     expect(view.getByText("最终回复")).toBeInTheDocument();
     expect(view.getByRole("textbox")).toBeEnabled();
+  });
+});
+
+describe("background AI panel", () => {
+  function setup() {
+    const gateways = createMockGateways();
+    type Response = typeof gateways.workspace.chatResult;
+    const jobs: {
+      resolve: (response: Response) => void;
+      reject: (error: Error) => void;
+      progress: NonNullable<Parameters<typeof gateways.workspace.chatWithNote>[4]>;
+    }[] = [];
+    gateways.workspace.chatWithNote = vi.fn<typeof gateways.workspace.chatWithNote>((_root, _settings, _messages, _target, progress) =>
+      new Promise<Response>((resolve, reject) => jobs.push({ resolve, reject, progress: progress! })));
+    setGatewaysForTests(gateways);
+    const onApply = vi.fn(() => true);
+    const panel = (root = "/workspace", currentTarget = target) => (
+      <AiRewritePanel onApply={onApply} onClose={() => undefined} onRefreshTarget={() => currentTarget}
+        onSave={async () => true} workspaceRoot={root} settings={DEFAULT_SETTINGS.ai} target={currentTarget} />
+    );
+    return { gateways, jobs, panel, onApply };
+  }
+
+  it("restores the active stream after unmount and keeps multiple sessions running while browsing history", async () => {
+    const { jobs, panel, onApply } = setup();
+    const user = userEvent.setup();
+    const first = render(panel());
+    await user.type(first.getByRole("textbox"), "第一个任务{enter}");
+    act(() => jobs[0].progress({ stage: "receiving", contentDelta: '{"message":"第一段' }));
+    first.unmount();
+    act(() => jobs[0].progress({ stage: "receiving", contentDelta: "继续生成" }));
+    const view = render(panel());
+    expect(view.getByText("第一段继续生成")).toBeInTheDocument();
+    expect(view.getByRole("textbox")).toBeDisabled();
+    await user.click(view.getByRole("button", { name: "新对话" }));
+    await user.type(view.getByRole("textbox"), "第二个任务{enter}");
+    act(() => jobs[1].progress({ stage: "receiving", contentDelta: '{"message":"第二段' }));
+    await user.click(view.getByRole("button", { name: "历史对话" }));
+    expect(view.getByRole("button", { name: /第一个任务.*处理中/ })).toBeInTheDocument();
+    expect(view.getByRole("button", { name: /第二个任务.*处理中/ })).toBeInTheDocument();
+    act(() => jobs[0].progress({ stage: "receiving", contentDelta: "再更新" }));
+    await user.click(view.getByRole("button", { name: /第一个任务.*notes.md/ }));
+    expect(view.getByText("第一段继续生成再更新")).toBeInTheDocument();
+    expect(view.queryByText("第二段")).not.toBeInTheDocument();
+    await act(async () => jobs[1].resolve({ message: "第二个完成", edit: null }));
+    expect(view.queryByText("第二个完成")).not.toBeInTheDocument();
+    await user.click(view.getByRole("button", { name: "历史对话" }));
+    await act(async () => jobs[0].resolve({ message: "第一个完成", edit: { tool: "replace_document", replacement: "后台生成的修改" } }));
+    await user.click(view.getByRole("button", { name: /第一个任务.*回复完成/ }));
+    expect(view.getByRole("region", { name: "建议修改" })).toHaveTextContent("后台生成的修改");
+    expect(onApply).not.toHaveBeenCalled();
+    await user.click(view.getByRole("button", { name: "应用" }));
+    expect(onApply).toHaveBeenCalledWith({ ...target, replacement: "后台生成的修改" });
+  });
+
+  it("keeps a workspace's active session and shows a background failure after returning", async () => {
+    const { jobs, panel } = setup();
+    const user = userEvent.setup();
+    const view = render(panel());
+    await user.type(view.getByRole("textbox"), "后台请求{enter}");
+    view.rerender(panel("/other", { ...target, path: "other.md" }));
+    await act(async () => jobs[0].reject(new Error("连接断开")));
+    expect(view.queryByRole("alert")).not.toBeInTheDocument();
+    view.rerender(panel());
+    expect(view.getByRole("alert")).toHaveTextContent("连接断开");
+    expect(view.getByText("后台请求")).toBeInTheDocument();
+    expect(view.getByRole("textbox")).toBeEnabled();
+    await user.type(view.getByRole("textbox"), "重新请求{enter}");
+    await act(async () => jobs[1].resolve({ message: "恢复成功", edit: null }));
+    expect(view.queryByRole("alert")).not.toBeInTheDocument();
+    expect(view.getByText("恢复成功")).toBeInTheDocument();
+  });
+
+  it("preserves each session's draft and original note when the editor target changes", async () => {
+    const { jobs, panel, gateways } = setup();
+    const user = userEvent.setup();
+    const view = render(panel());
+    await user.type(view.getByRole("textbox"), "笔记一{enter}");
+    view.rerender(panel("/workspace", { ...target, path: "other.md", source: "另一篇" }));
+    await act(async () => jobs[0].resolve({ message: "完成一", edit: null }));
+    await user.type(view.getByRole("textbox"), "未发送的草稿");
+    await user.click(view.getByRole("button", { name: "新对话" }));
+    await user.type(view.getByRole("textbox"), "笔记二{enter}");
+    await act(async () => jobs[1].resolve({ message: "完成二", edit: null }));
+    await user.click(view.getByRole("button", { name: "历史对话" }));
+    await user.click(view.getByRole("button", { name: /笔记一.*notes.md/ }));
+    expect(view.getByRole("textbox")).toHaveValue("未发送的草稿");
+    expect(view.getByRole("button", { name: "引用当前笔记" })).toHaveTextContent("notes");
+    await user.type(view.getByRole("textbox"), "{enter}");
+    expect(vi.mocked(gateways.workspace.chatWithNote).mock.calls[2][3]).toEqual(target);
+    await act(async () => jobs[2].resolve({ message: "完成草稿", edit: null }));
   });
 });

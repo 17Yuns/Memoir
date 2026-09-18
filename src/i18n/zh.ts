@@ -269,7 +269,7 @@ export const zh = {
   "aiRewrite.history": "历史对话",
   "aiRewrite.historyEmpty": "还没有历史对话，发送消息后会自动保存。",
   "aiRewrite.historyLoading": "正在加载历史对话…",
-  "aiRewrite.historyContextHint": "继续历史对话时，将使用当前打开的笔记作为上下文。",
+  "aiRewrite.historyContextHint": "会话可在后台同时运行。切换会话会保留生成进度和笔记上下文。",
   "aiRewrite.historyLoadFailed": "历史对话加载失败，请重试。",
   "aiRewrite.historySaveFailed": "历史对话保存失败，请重试后再退出应用。",
   "aiRewrite.historyRetry": "重试",

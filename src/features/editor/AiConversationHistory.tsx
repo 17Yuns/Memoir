@@ -1,14 +1,16 @@
 import * as stylex from "@stylexjs/stylex";
-import { MessageSquare, Trash2 } from "lucide-react";
+import { LoaderCircle, MessageSquare, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { Button, IconButton } from "../../components/ui";
+import type { AiConversationSession } from "./ai-conversation-history";
 import type { AiConversation } from "../../domain/ai";
 import { useI18n } from "../../i18n/react";
 import { accents, colors } from "../../styles/tokens.stylex";
 
-export function AiConversationHistory({ conversations, activeId, loading, onOpen, onDelete }: {
+export function AiConversationHistory({ conversations, activeId, sessions, loading, onOpen, onDelete }: {
   conversations: AiConversation[];
   activeId: string | null;
+  sessions: Record<string, AiConversationSession>;
   loading: boolean;
   onOpen: (conversation: AiConversation) => void;
   onDelete: (id: string) => void;
@@ -29,6 +31,11 @@ export function AiConversationHistory({ conversations, activeId, loading, onOpen
                   {...stylex.props(styles.open)}>
                   <span {...stylex.props(styles.title)}><MessageSquare aria-hidden="true" size={13} />{conversation.title}</span>
                   <span {...stylex.props(styles.metadata)}>
+                    {sessions[conversation.id]?.task && <span {...stylex.props(styles.taskStatus)}>
+                      {sessions[conversation.id].task?.status === "running" && <LoaderCircle size={11} {...stylex.props(styles.spinner)} />}
+                      {t(sessions[conversation.id].task?.status === "running" ? "aiRewrite.generating"
+                        : sessions[conversation.id].task?.status === "failed" ? "aiRewrite.failed" : "aiRewrite.completed")}
+                    </span>}
                     {conversation.notePath && <span title={conversation.notePath} {...stylex.props(styles.path)}>{conversation.notePath}</span>}
                     <time dateTime={new Date(conversation.updatedAt).toISOString()}>
                       {new Date(conversation.updatedAt).toLocaleString(locale === "zh" ? "zh-CN" : "en-US", {
@@ -56,7 +63,11 @@ export function AiConversationHistory({ conversations, activeId, loading, onOpen
   );
 }
 
+const spin = stylex.keyframes({ to: { transform: "rotate(360deg)" } });
+
 const styles = stylex.create({
+  taskStatus: { display: "inline-flex", alignItems: "center", gap: "4px", color: accents.primary },
+  spinner: { animationName: spin, animationDuration: "900ms", animationIterationCount: "infinite", animationTimingFunction: "linear" },
   history: { minHeight: 0, overflowY: "auto", padding: "14px" },
   heading: { margin: "0 0 8px", color: colors.text, fontSize: "13px", fontWeight: 650 },
   hint: { margin: "0 0 10px", color: colors.muted, fontSize: "11px", lineHeight: 1.6 },

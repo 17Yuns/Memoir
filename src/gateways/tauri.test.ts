@@ -361,6 +361,47 @@ describe("Tauri gateways", () => {
     expect(unlisten).toHaveBeenCalledOnce();
   });
 
+  it("isolates progress listeners and cleanup for concurrent AI requests", async () => {
+    const { TauriWorkspaceGateway } = await import("./tauri");
+    const { DEFAULT_SETTINGS } = await import("../domain/settings");
+    type Event = { payload: { requestId: string; stage: string; contentDelta: string } };
+    const listeners = new Set<(event: Event) => void>();
+    const unlisteners = [vi.fn(), vi.fn()];
+    listen.mockImplementation(async (_event: string, handler: (event: Event) => void) => {
+      const unlisten = unlisteners[listeners.size];
+      listeners.add(handler);
+      return () => { listeners.delete(handler); unlisten(); };
+    });
+    const requests: { requestId: string; finish: () => void }[] = [];
+    invoke.mockImplementation((_command: string, args: { requestId: string }) => new Promise((resolve) => {
+      requests.push({ requestId: args.requestId, finish: () => resolve({ message: "done", edit: null }) });
+    }));
+    const gateway = new TauriWorkspaceGateway();
+    const firstProgress = vi.fn();
+    const secondProgress = vi.fn();
+    const first = gateway.chatWithNote("/one", DEFAULT_SETTINGS.ai, [], null, firstProgress);
+    await vi.waitFor(() => expect(requests).toHaveLength(1));
+    const second = gateway.chatWithNote("/two", DEFAULT_SETTINGS.ai, [], null, secondProgress);
+    await vi.waitFor(() => expect(requests).toHaveLength(2));
+    expect(requests[0].requestId).not.toBe(requests[1].requestId);
+    const emit = (index: number) => listeners.forEach((listener) => listener({ payload: {
+      requestId: requests[index].requestId, stage: "receiving", contentDelta: `reply ${index}`,
+    } }));
+    emit(0);
+    expect(firstProgress).toHaveBeenCalledOnce();
+    expect(secondProgress).not.toHaveBeenCalled();
+    requests[0].finish();
+    await first;
+    expect(unlisteners[0]).toHaveBeenCalledOnce();
+    expect(unlisteners[1]).not.toHaveBeenCalled();
+    emit(1);
+    expect(secondProgress).toHaveBeenCalledOnce();
+    requests[1].finish();
+    await second;
+    expect(listeners.size).toBe(0);
+    expect(unlisteners[1]).toHaveBeenCalledOnce();
+  });
+
   it("asks draftsExist with camelCase arguments", async () => {
     const { TauriPersistenceGateway } = await import("./tauri");
     invoke.mockResolvedValue(["one.md"]);

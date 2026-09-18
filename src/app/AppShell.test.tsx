@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { DEFAULT_SIDEBAR_WIDTH, DEFAULT_WORKSPACE_LAYOUT } from "../domain/layout";
 import { DEFAULT_SETTINGS } from "../domain/settings";
 import { resetAppUpdateCheckForTests } from "../features/update/useAppUpdateCheck";
@@ -59,9 +59,14 @@ afterEach(() => {
 });
 
 describe("AppShell AI navigation", () => {
-  it("opens AI editing in the library column for the active note", async () => {
+  it("restores the active AI stream after switching sidebar panels", async () => {
     const initialize = useAppStore.getState().initialize;
-    setGatewaysForTests(createMockGateways());
+    const gateways = createMockGateways();
+    let finish!: (response: typeof gateways.workspace.chatResult) => void;
+    let report!: NonNullable<Parameters<typeof gateways.workspace.chatWithNote>[4]>;
+    gateways.workspace.chatWithNote = vi.fn<typeof gateways.workspace.chatWithNote>((_root, _settings, _messages, _target, progress) =>
+      new Promise((resolve) => { finish = resolve; report = progress!; }));
+    setGatewaysForTests(gateways);
     useAppStore.setState({
       initialize: async () => undefined,
       initialized: true,
@@ -101,6 +106,17 @@ describe("AppShell AI navigation", () => {
       expect(view.getByRole("complementary", { name: "AI 助手" })).toHaveTextContent(
         "Alpha Guide",
       );
+      await user.type(view.getByRole("textbox", { name: "输入你的要求" }), "后台总结{enter}");
+      act(() => report({ stage: "receiving", contentDelta: '{"message":"开始总结' }));
+      await user.click(view.getByRole("button", { name: /所有笔记/ }));
+      expect(view.queryByRole("complementary", { name: "AI 助手" })).not.toBeInTheDocument();
+      act(() => report({ stage: "receiving", contentDelta: "，后台继续" }));
+      await user.click(view.getByRole("button", { name: "AI 助手" }));
+      expect(view.getByText("开始总结，后台继续")).toBeInTheDocument();
+      expect(view.getByRole("textbox", { name: "输入你的要求" })).toBeDisabled();
+      await act(async () => finish({ message: "后台总结完成", edit: null }));
+      expect(view.getByText("后台总结完成")).toBeInTheDocument();
+      expect(gateways.workspace.chatWithNote).toHaveBeenCalledOnce();
     } finally {
       cleanup();
       useAppStore.setState({ initialize });

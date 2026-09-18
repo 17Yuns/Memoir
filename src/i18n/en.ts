@@ -272,7 +272,7 @@ export const en = {
   "aiRewrite.history": "Conversation history",
   "aiRewrite.historyEmpty": "No conversations yet. Messages are saved automatically.",
   "aiRewrite.historyLoading": "Loading conversations…",
-  "aiRewrite.historyContextHint": "Continuing a conversation uses the currently open note as context.",
+  "aiRewrite.historyContextHint": "Conversations can run in the background at the same time. Switching keeps their progress and note context.",
   "aiRewrite.historyLoadFailed": "Could not load conversation history. Please retry.",
   "aiRewrite.historySaveFailed": "Could not save conversation history. Retry before quitting the app.",
   "aiRewrite.historyRetry": "Retry",

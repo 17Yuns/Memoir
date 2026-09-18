@@ -23,18 +23,13 @@ import { Button, IconButton, PanelHeader } from "../../components/ui";
 import {
   citationTitleFromPath,
   formatNoteCitation,
-  selectUsedNoteCitations,
-  type AiChatMessage,
   type AiConversation,
-  type AiConversationMessage,
   type AiChatProgress,
   type AiEditorEdit,
   type AiNoteCitation,
   type AiRewriteTarget,
   type AiSettings,
 } from "../../domain/ai";
-import { mapGatewayError } from "../../domain/errors";
-import { getGateways } from "../../gateways";
 import { useI18n } from "../../i18n/react";
 import { isTauriRuntime } from "../../platform/runtime";
 import { useAppStore } from "../../store/app-store";
@@ -44,12 +39,12 @@ import { handleWindowDragMouseDown } from "../window/window-drag";
 
 import { AiMessageMarkdown } from "./AiMessageMarkdown";
 import { streamedMessage } from "./ai-stream-preview";
-import { useAiConversationHistory } from "./ai-conversation-history";
+import { EMPTY_AI_SESSION, useAiConversationHistory } from "./ai-conversation-history";
 import { AiConversationHistory } from "./AiConversationHistory";
 
 type Activity = { progress: AiChatProgress; elapsedMs: number };
 type LiveReply = { raw: string; reasoning: string; activity: Activity[] };
-const emptyReply = (): LiveReply => ({ raw: "", reasoning: "", activity: [] });
+const EMPTY_REPLY: LiveReply = { raw: "", reasoning: "", activity: [] };
 
 export function AiRewritePanel({
   workspaceRoot,
@@ -69,48 +64,44 @@ export function AiRewritePanel({
   onSave: () => Promise<boolean>;
 }) {
   const { t } = useI18n();
-  const { history, conversations, pendingIds, loaded: historyLoaded, error: historyError } = useAiConversationHistory(workspaceRoot);
+  const { history, conversations, sessions, draftSession, activeId: conversationId,
+    loaded: historyLoaded, error: historyError } = useAiConversationHistory(workspaceRoot);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [conversationId, setConversationId] = useState<string | null>(null);
   const notes = useAppStore((state) => state.notes);
-  const [contextTarget, setContextTarget] = useState(target);
-  const [includeContext, setIncludeContext] = useState(true);
+  const session = conversationId === null ? draftSession : sessions[conversationId] ?? EMPTY_AI_SESSION;
+  const contextTarget = session.contextTarget === undefined ? target : session.contextTarget;
+  const { draft, includeContext, pendingEdit, task } = session;
+  const setContextTarget = (contextTarget: AiRewriteTarget | null) => history.updateSession(conversationId, { contextTarget });
+  const setDraft = (draft: string) => history.updateSession(conversationId, { draft });
+  const setPendingEdit = (pendingEdit: AiEditorEdit | null) => history.updateSession(conversationId, { pendingEdit });
   const messages = conversations.find((item) => item.id === conversationId)?.messages ?? [];
-  const conversationPending = conversationId !== null && pendingIds.includes(conversationId);
-  const [draft, setDraft] = useState("");
-  const [pendingEdit, setPendingEdit] = useState<AiEditorEdit | null>(null);
-  const [error, setError] = useState("");
+  const [localError, setError] = useState("");
+  const error = localError || (task?.error ? t("aiRewrite.requestFailed", {
+    message: task.error.code === "serialization" ? t("aiRewrite.invalidResponse") : task.error.message,
+  }) : "");
   const [notice, setNotice] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [progress, setProgress] = useState<AiChatProgress | null>(null);
-  const [live, setLive] = useState<LiveReply>(emptyReply);
+  const loading = task?.status === "running";
+  const progress = task?.progress ?? null;
+  const live = task ?? EMPTY_REPLY;
   const liveMessage = useMemo(() => streamedMessage(live.raw), [live.raw]);
   const followScrollRef = useRef(true);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [saving, setSaving] = useState(false);
-  const requestIdRef = useRef(0);
-  const startedAtRef = useRef<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => setHistoryOpen(false), [workspaceRoot]);
+
   useEffect(() => {
-    requestIdRef.current += 1;
-    setContextTarget(target);
-    setIncludeContext(true);
-    setConversationId(null);
-    setHistoryOpen(false);
-    setDraft("");
-    setPendingEdit(null);
     setError("");
     setNotice("");
-    setLoading(false);
-    setProgress(null);
-    setLive(emptyReply());
-    setElapsedMs(0);
     setSaving(false);
-    return () => {
-      requestIdRef.current += 1;
-    };
-  }, [target, workspaceRoot]);
+    followScrollRef.current = true;
+  }, [conversationId, workspaceRoot]);
+
+  useEffect(() => {
+    // A new draft follows the editor; existing sessions retain their own context.
+    if (history.getSnapshot().activeId === null) history.updateSession(null, { contextTarget: target });
+  }, [history, target]);
 
   useEffect(() => {
     const onKeyDown = (event: globalThis.KeyboardEvent) => {
@@ -127,15 +118,16 @@ export function AiRewritePanel({
     if (!scroll || !followScrollRef.current) return;
     if (typeof scroll.scrollTo === "function") scroll.scrollTo({ top: scroll.scrollHeight });
     else scroll.scrollTop = scroll.scrollHeight;
-  }, [loading, messages, pendingEdit, live]);
+  }, [loading, messages, pendingEdit, live, historyOpen, conversationId]);
 
   useEffect(() => {
-    if (!loading || startedAtRef.current === null) return;
-    const update = () => setElapsedMs(Date.now() - (startedAtRef.current ?? Date.now()));
+    if (!task) { setElapsedMs(0); return; }
+    const update = () => setElapsedMs((task.finishedAt ?? Date.now()) - task.startedAt);
     update();
+    if (!loading) return;
     const timer = window.setInterval(update, 1000);
     return () => window.clearInterval(timer);
-  }, [loading]);
+  }, [loading, task?.startedAt, task?.finishedAt, conversationId]);
 
   const diffRows = useMemo(
     () => (pendingEdit ? createLineDiff(pendingEdit.source, pendingEdit.replacement) : []),
@@ -154,102 +146,13 @@ export function AiRewritePanel({
       citationTitleFromPath(contextTarget.path)
     : "";
 
-  const send = async () => {
-    const prompt = draft.trim();
-    if (!prompt || loading || conversationPending || !contextTarget || !workspaceRoot || !historyLoaded) return;
-    const userMessage: AiChatMessage = { role: "user", content: prompt };
-    const conversation = [...messages, userMessage];
-    const requestMessages = conversation.map(({ role, content }) => ({ role, content }));
-    let reply = emptyReply();
-    setLive(reply);
+  const send = () => {
+    if (!draft.trim() || loading || !contextTarget || !workspaceRoot || !historyLoaded) return;
     followScrollRef.current = true;
-    const requestTarget = !includeContext ? null : pendingEdit
-      ? {
-          ...contextTarget,
-          to: contextTarget.from + pendingEdit.replacement.length,
-          source: pendingEdit.replacement,
-        }
-      : contextTarget;
-    const requestId = ++requestIdRef.current;
-    const id = conversationId ?? crypto.randomUUID();
-    const previous = conversations.find((item) => item.id === id);
-    const startedAt = Date.now();
-    history.put({
-      id,
-      title: previous?.title ?? prompt.replace(/\s+/g, " ").slice(0, 60),
-      notePath: previous?.notePath ?? contextTarget.path,
-      createdAt: previous?.createdAt ?? startedAt,
-      updatedAt: startedAt,
-      messages: conversation,
-    });
-    setConversationId(id);
-    history.setPending(id, true);
-    setDraft("");
     setError("");
     setNotice("");
-    setLoading(true);
-    startedAtRef.current = Date.now();
-    setElapsedMs(0);
-    setProgress({ stage: "preparing" });
-    try {
-      const response = await getGateways().workspace.chatWithNote(
-        workspaceRoot,
-        settings,
-        requestMessages,
-        requestTarget,
-        (nextProgress) => {
-          // Tool rounds have separate envelopes; preview only the current answer.
-          const raw = nextProgress.stage === "callingTool" || nextProgress.stage === "generating"
-            ? "" : reply.raw + (nextProgress.contentDelta ?? "");
-          const previous = reply.activity[reply.activity.length - 1]?.progress;
-          const changed = previous?.stage !== nextProgress.stage || previous?.tool !== nextProgress.tool || previous?.query !== nextProgress.query;
-          const activity = changed
-            ? [...reply.activity, { progress: { ...nextProgress, contentDelta: undefined, reasoningDelta: undefined }, elapsedMs: Date.now() - startedAt }]
-            : reply.activity;
-          reply = { raw, reasoning: reply.reasoning + (nextProgress.reasoningDelta ?? ""), activity };
-          if (requestId !== requestIdRef.current) return;
-          setProgress(nextProgress);
-          setLive(reply);
-        },
-      );
-      const completedMessages: AiConversationMessage[] = [
-        ...conversation,
-        {
-          role: "assistant",
-          content: response.message || t("aiRewrite.assistant"),
-          reasoning: reply.reasoning,
-          activity: reply.activity,
-          elapsedMs: Date.now() - startedAt,
-          citations: selectUsedNoteCitations(
-            response.message || t("aiRewrite.assistant"),
-            response.citations,
-            requestTarget && !response.edit
-              ? { path: requestTarget.path, title: citationTitleFromPath(requestTarget.path) }
-              : null,
-          ),
-        },
-      ];
-      history.complete(id, completedMessages);
-      if (requestId !== requestIdRef.current) return;
-      if (requestTarget && response.edit && response.edit.replacement !== contextTarget.source) {
-        setPendingEdit({ ...contextTarget, replacement: response.edit.replacement });
-      }
-    } catch (requestError) {
-      if (requestId === requestIdRef.current) {
-        const error = mapGatewayError(requestError);
-        setProgress({ stage: "failed" });
-        setLive({ ...reply, raw: "", activity: [...reply.activity, { progress: { stage: "failed" }, elapsedMs: Date.now() - (startedAtRef.current ?? Date.now()) }] });
-        setError(t("aiRewrite.requestFailed", {
-          message: error.code === "serialization" ? t("aiRewrite.invalidResponse") : error.message,
-        }));
-      }
-    } finally {
-      history.setPending(id, false);
-      if (requestId === requestIdRef.current) {
-        setLoading(false);
-        startedAtRef.current = null;
-      }
-    }
+    history.send({ id: conversationId, prompt: draft, target: contextTarget, settings,
+      fallbackReply: t("aiRewrite.assistant") });
   };
 
   const handleDraftKeyDown = (event: ReactKeyboardEvent<HTMLTextAreaElement>) => {
@@ -266,6 +169,7 @@ export function AiRewritePanel({
   };
 
   const refreshContext = () => {
+    if (loading || saving) return;
     const nextTarget = onRefreshTarget();
     if (!nextTarget) return;
     setContextTarget(nextTarget);
@@ -275,30 +179,23 @@ export function AiRewritePanel({
   };
 
   const startNewConversation = () => {
-    requestIdRef.current += 1;
-    setConversationId(null);
+    history.newConversation(onRefreshTarget());
     setHistoryOpen(false);
-    setDraft("");
-    setPendingEdit(null);
     setError("");
     setNotice("");
-    setLoading(false);
-    setProgress(null);
-    setLive(emptyReply());
-    setElapsedMs(0);
-    startedAtRef.current = null;
-    const nextTarget = onRefreshTarget();
-    if (nextTarget) setContextTarget(nextTarget);
   };
 
   const openConversation = (conversation: AiConversation) => {
-    startNewConversation();
-    setConversationId(conversation.id);
+    if (!sessions[conversation.id]) {
+      history.updateSession(conversation.id, { contextTarget: onRefreshTarget() });
+    }
+    history.select(conversation.id);
+    setHistoryOpen(false);
     followScrollRef.current = true;
   };
 
   const applyPendingEdit = async (save: boolean) => {
-    if (!pendingEdit || saving) return;
+    if (!pendingEdit || saving || loading) return;
     setError("");
     setNotice("");
     if (!onApply(pendingEdit)) {
@@ -319,6 +216,7 @@ export function AiRewritePanel({
     }
     setSaving(true);
     const saved = await onSave();
+    if (history.getSnapshot().activeId !== conversationId) return;
     setSaving(false);
     if (saved) setNotice(t("aiRewrite.appliedAndSaved"));
     else setError(t("aiRewrite.saveFailed"));
@@ -334,6 +232,7 @@ export function AiRewritePanel({
         <AiPanelHeader
           onNewConversation={startNewConversation}
           onRefresh={refreshContext}
+          refreshDisabled={loading || saving}
           historyOpen={historyOpen}
           onHistory={() => setHistoryOpen((open) => !open)}
         />
@@ -344,7 +243,7 @@ export function AiRewritePanel({
       </div>
 
       {historyOpen ? (
-        <AiConversationHistory conversations={conversations} activeId={conversationId}
+        <AiConversationHistory conversations={conversations} activeId={conversationId} sessions={sessions}
           loading={Boolean(workspaceRoot) && !historyLoaded && !historyError} onOpen={openConversation}
           onDelete={(id) => {
             history.remove(id);
@@ -408,7 +307,6 @@ export function AiRewritePanel({
               ) : <p {...stylex.props(styles.messageContent)}>{message.content}</p>}
             </article>
           ))}
-          {conversationPending && !loading && <p role="status" {...stylex.props(styles.loadingMessage)}>{t("aiRewrite.generating")}</p>}
           {(loading || (error && live.activity.length > 0)) && (
             <article {...stylex.props(styles.message, styles.assistantMessage)}>
               <span {...stylex.props(styles.messageAuthor)}>{t("aiRewrite.assistant")}</span>
@@ -469,7 +367,7 @@ export function AiRewritePanel({
             </div>
             <footer {...stylex.props(styles.diffActions)}>
               <Button
-                disabled={saving}
+                disabled={saving || loading}
                 onClick={() => setPendingEdit(null)}
                 size="sm"
                 style={styles.discardButton}
@@ -480,7 +378,7 @@ export function AiRewritePanel({
               </Button>
               <span {...stylex.props(styles.diffActionGroup)}>
                 <Button
-                  disabled={saving}
+                  disabled={saving || loading}
                   onClick={() => void applyPendingEdit(false)}
                   size="sm"
                 >
@@ -488,7 +386,7 @@ export function AiRewritePanel({
                   {t("aiRewrite.applyEdit")}
                 </Button>
                 <Button
-                  disabled={saving}
+                  disabled={saving || loading}
                   onClick={() => void applyPendingEdit(true)}
                   size="sm"
                   variant="primary"
@@ -512,7 +410,7 @@ export function AiRewritePanel({
           <textarea
             autoFocus
             aria-label={t("aiRewrite.instruction")}
-            disabled={loading || conversationPending}
+            disabled={loading}
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleDraftKeyDown}
             placeholder={t("aiRewrite.placeholder")}
@@ -525,7 +423,7 @@ export function AiRewritePanel({
               aria-label={t("aiRewrite.includeContext")}
               aria-pressed={includeContext}
               disabled={loading}
-              onClick={() => setIncludeContext((included) => !included)}
+              onClick={() => history.updateSession(conversationId, { includeContext: !includeContext })}
               size="sm"
               variant="ghost"
               title={t(includeContext ? "aiRewrite.contextChipHintOn" : "aiRewrite.contextChipHintOff", {
@@ -542,7 +440,7 @@ export function AiRewritePanel({
             </Button>
             <Button
               aria-label={loading ? t("aiRewrite.generating") : t("aiRewrite.generate")}
-              disabled={loading || conversationPending || !draft.trim() || !historyLoaded || !workspaceRoot}
+              disabled={loading || !draft.trim() || !historyLoaded || !workspaceRoot}
               onClick={() => void send()}
               size="icon"
               style={styles.sendButton}
@@ -652,11 +550,13 @@ function AiProgressStatus({
 function AiPanelHeader({
   onNewConversation,
   onRefresh,
+  refreshDisabled,
   onHistory,
   historyOpen,
 }: {
   onNewConversation: () => void;
   onRefresh: () => void;
+  refreshDisabled: boolean;
   onHistory: () => void;
   historyOpen: boolean;
 }) {
@@ -672,7 +572,7 @@ function AiPanelHeader({
           <IconButton label={t("aiRewrite.history")} onClick={onHistory} active={historyOpen} style={styles.headerButton}>
             <History {...stylex.props(styles.headerIcon)} />
           </IconButton>
-          <IconButton label={t("aiRewrite.refreshContext")} onClick={onRefresh} style={styles.headerButton}>
+          <IconButton label={t("aiRewrite.refreshContext")} onClick={onRefresh} disabled={refreshDisabled} style={styles.headerButton}>
             <RefreshCw {...stylex.props(styles.headerIcon)} />
           </IconButton>
           <IconButton

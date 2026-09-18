@@ -160,7 +160,8 @@ function previewComponents(
     missingWikiLink: (name: string) => string;
   },
   catalog: NoteGraphNode[],
-  onOpenNote?: (path: string) => void,
+  onOpenNote: ((path: string) => void) | undefined,
+  exportMode: boolean,
 ): MDXComponents {
   const gateway = getGateways().workspace;
   const system = getGateways().system;
@@ -274,7 +275,7 @@ function previewComponents(
               </p>
             }
           >
-            <MermaidBlock code={String(children).trim()} />
+            <MermaidBlock code={String(children).trim()} interactive={!exportMode} />
           </Suspense>
         );
       }
@@ -374,8 +375,9 @@ export function NotePreviewArticle({
         },
         graph.nodes,
         (path) => void selectNoteRef.current(path),
+        exportMode,
       ),
-    [graph.nodes, loadingMermaidLabel, onToggleTask, relativePath, root, t, toggleTaskLabel],
+    [exportMode, graph.nodes, loadingMermaidLabel, onToggleTask, relativePath, root, t, toggleTaskLabel],
   );
   const [mdxComponent, setMdxComponent] = useState<ComponentType<{
     components?: MDXComponents;

@@ -1,11 +1,11 @@
-import { act, cleanup, render, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { NoteMeta } from "../../domain/notes";
 import { setGatewaysForTests } from "../../gateways";
 import { useAppStore } from "../../store/app-store";
 import { createMockGateways } from "../../test/mock-gateways";
-import { MARKDOWN_PREVIEW_DELAY_MS } from "./NotePreviewArticle";
+import { MARKDOWN_PREVIEW_DELAY_MS, NotePreviewArticle } from "./NotePreviewArticle";
 import { LONG_NOTE_DEFER_THRESHOLD } from "../editor/editor-performance";
 import { PreviewPane } from "./PreviewPane";
 import { resetLinkPreviewCache } from "./link-preview-cache";
@@ -13,7 +13,9 @@ import { resetMermaidRuntime } from "./mermaid-runtime";
 
 const mermaidMock = vi.hoisted(() => ({
   initialize: vi.fn(),
-  render: vi.fn(async () => ({ svg: "<svg data-test='mermaid'></svg>" })),
+  render: vi.fn(async () => ({
+    svg: '<svg data-test="mermaid" id="memoir-mmd-1" viewBox="0 0 400 200"></svg>',
+  })),
 }));
 
 vi.mock("mermaid", () => ({
@@ -315,6 +317,71 @@ describe("PreviewPane fenced code", () => {
     });
     expect(mermaidMock.initialize).toHaveBeenCalledTimes(1);
     expect(mermaidMock.render).toHaveBeenCalledTimes(1);
+  });
+
+  it("opens a mermaid lightbox that can zoom, pan, and close", async () => {
+    HTMLElement.prototype.setPointerCapture = vi.fn();
+    HTMLElement.prototype.releasePointerCapture = vi.fn();
+    HTMLElement.prototype.hasPointerCapture = vi.fn(() => true);
+
+    const view = render(
+      <PreviewPane
+        activePath="hello.md"
+        content={"```mermaid\ngraph LR\nA-->B\n```\n"}
+        note={{ ...note, relativePath: "hello.md", fileName: "hello.md", title: "Hello" }}
+        onContentChange={() => undefined}
+        root="/notes"
+      />,
+    );
+    const user = userEvent.setup();
+    const expand = await view.findByRole("button", { name: "放大预览图表" });
+    await user.click(expand);
+
+    const dialog = view.getByRole("dialog", { name: "图表预览" });
+    const canvas = dialog.querySelector("[data-mermaid-canvas]");
+    const stage = dialog.querySelector("[data-mermaid-stage]");
+    expect(canvas).toBeTruthy();
+    expect(stage).toBeTruthy();
+    expect(dialog.querySelector("[data-test='mermaid']")).toBeTruthy();
+
+    const startScale = Number(canvas?.getAttribute("data-scale"));
+    await user.click(view.getByRole("button", { name: "放大" }));
+    const zoomedScale = Number(canvas?.getAttribute("data-scale"));
+    expect(zoomedScale).toBeGreaterThan(startScale);
+
+    fireEvent.wheel(stage as HTMLElement, { deltaY: -120, clientX: 40, clientY: 20 });
+    expect(Number(canvas?.getAttribute("data-scale"))).toBeGreaterThan(zoomedScale);
+
+    const startX = Number(canvas?.getAttribute("data-x"));
+    await user.pointer([
+      { keys: "[MouseLeft>]", target: stage as HTMLElement, coords: { clientX: 10, clientY: 10, x: 10, y: 10 } },
+      { coords: { clientX: 55, clientY: 10, x: 55, y: 10 } },
+      { keys: "[/MouseLeft]" },
+    ]);
+    expect(Number(canvas?.getAttribute("data-x"))).toBeCloseTo(startX + 45);
+
+    await user.keyboard("{Escape}");
+    await waitFor(() => {
+      expect(view.queryByRole("dialog", { name: "图表预览" })).toBeNull();
+    });
+  });
+
+  it("keeps mermaid diagrams static in export mode", async () => {
+    const view = render(
+      <NotePreviewArticle
+        compileDelay={0}
+        content={"```mermaid\ngraph LR\nA-->B\n```\n"}
+        exportMode
+        note={{ ...note, relativePath: "hello.md", fileName: "hello.md", title: "Hello" }}
+        relativePath="hello.md"
+        root="/notes"
+      />,
+    );
+    await waitFor(() => {
+      expect(view.container.querySelector("[data-mermaid-block] svg")).toBeTruthy();
+    });
+    expect(view.queryByRole("button", { name: "放大预览图表" })).toBeNull();
+    expect(view.queryByRole("dialog")).toBeNull();
   });
 });
 

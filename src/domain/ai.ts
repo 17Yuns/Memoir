@@ -77,7 +77,7 @@ function messageIncludesToken(message: string, token: string): boolean {
 }
 
 export function messageMentionsCitation(message: string, citation: AiNoteCitation): boolean {
-  const path = citation.path.replaceAll("\\", "/");
+  const path = citation.path.replace(/\\/g, "/");
   return messageIncludesToken(message, path) || messageIncludesToken(message, citationFileName(path));
 }
 

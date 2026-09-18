@@ -63,15 +63,16 @@ describe("AiRewritePanel", () => {
         onRefreshTarget={() => target} onSave={async () => true} workspaceRoot="/workspace"
         settings={{ ...DEFAULT_SETTINGS.ai, enabled: true }} target={target} />,
     );
-    const context = view.getByRole("button", { name: "将当前文档加入上下文" });
+    const context = view.getByRole("button", { name: "引用当前笔记" });
     expect(context).toHaveAttribute("aria-pressed", "true");
+    expect(context).toHaveTextContent("notes");
     expect(view.queryByText(DEFAULT_SETTINGS.ai.chatModel)).not.toBeInTheDocument();
     expect(view.queryByText("正在处理整篇笔记")).not.toBeInTheDocument();
     expect(view.queryByText(target.path)).not.toBeInTheDocument();
 
     await user.click(context);
     expect(context).toHaveAttribute("aria-pressed", "false");
-    expect(context).toHaveTextContent("未添加");
+    expect(context).toHaveTextContent("notes");
     await user.type(view.getByRole("textbox"), "你好{enter}");
     await view.findByText("回答");
     expect(gateways.workspace.chatCalls[0].target).toBeNull();

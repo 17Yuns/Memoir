@@ -34,6 +34,7 @@ import { mapGatewayError } from "../../domain/errors";
 import { getGateways } from "../../gateways";
 import { useI18n } from "../../i18n/react";
 import { isTauriRuntime } from "../../platform/runtime";
+import { useAppStore } from "../../store/app-store";
 import { accents, colors, motion, typography } from "../../styles/tokens.stylex";
 import { compactDiffRows, createLineDiff, diffStats } from "./ai-diff";
 import { handleWindowDragMouseDown } from "../window/window-drag";
@@ -69,6 +70,7 @@ export function AiRewritePanel({
   onSave: () => Promise<boolean>;
 }) {
   const { t } = useI18n();
+  const notes = useAppStore((state) => state.notes);
   const [contextTarget, setContextTarget] = useState(target);
   const [includeContext, setIncludeContext] = useState(true);
   const [messages, setMessages] = useState<ConversationMessage[]>([]);
@@ -143,6 +145,10 @@ export function AiRewritePanel({
     t("aiRewrite.expand"),
     t("aiRewrite.fix"),
   ];
+  const contextNoteLabel = contextTarget
+    ? notes.find((note) => note.relativePath === contextTarget.path)?.title?.trim() ||
+      citationTitleFromPath(contextTarget.path)
+    : "";
 
   const send = async () => {
     const prompt = draft.trim();
@@ -490,17 +496,17 @@ export function AiRewritePanel({
               onClick={() => setIncludeContext((included) => !included)}
               size="sm"
               variant="ghost"
-              title={includeContext ? contextTarget.path : t("aiRewrite.includeContext")}
-              style={[styles.contextButton, includeContext && styles.contextButtonActive]}
+              title={t(includeContext ? "aiRewrite.contextChipHintOn" : "aiRewrite.contextChipHintOff", {
+                path: contextTarget.path,
+              })}
+              style={[styles.contextChip, includeContext ? styles.contextChipOn : styles.contextChipOff]}
             >
-              <FileText aria-hidden="true" {...stylex.props(styles.buttonIcon)} />
-              {t("aiRewrite.context")}
-              <span {...stylex.props(styles.contextButtonLabel)}>
-                {includeContext
-                  ? t(contextTarget.scope === "selection" ? "aiRewrite.selectionContext" : "aiRewrite.currentDocument")
-                  : t("aiRewrite.noContext")}
+              <FileText aria-hidden="true" {...stylex.props(styles.contextChipIcon)} />
+              <span {...stylex.props(styles.contextChipLabel)}>
+                {contextTarget.scope === "selection"
+                  ? t("aiRewrite.contextChipSelection", { note: contextNoteLabel })
+                  : contextNoteLabel}
               </span>
-              {includeContext && <Check aria-hidden="true" {...stylex.props(styles.buttonIcon)} />}
             </Button>
             <Button
               aria-label={loading ? t("aiRewrite.generating") : t("aiRewrite.generate")}
@@ -965,9 +971,38 @@ const styles = stylex.create({
     gap: "8px",
     padding: "3px 5px 6px 10px",
   },
-  contextButton: { minWidth: 0, paddingInline: "6px", fontSize: "10px", gap: "5px" },
-  contextButtonActive: { color: accents.primary },
-  contextButtonLabel: { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  contextChip: {
+    minWidth: 0,
+    maxWidth: 168,
+    height: "24px",
+    overflow: "hidden",
+    paddingInline: "8px",
+    borderRadius: "999px",
+    borderWidth: "1px",
+    borderStyle: "solid",
+    fontSize: "11px",
+    fontWeight: 550,
+    gap: "5px",
+    boxShadow: "none",
+  },
+  contextChipOn: {
+    borderColor: `color-mix(in srgb, ${accents.primary} 28%, ${colors.border})`,
+    backgroundColor: {
+      default: `color-mix(in srgb, ${accents.primary} 10%, ${colors.canvas})`,
+      ":hover": `color-mix(in srgb, ${accents.primary} 16%, ${colors.canvas})`,
+    },
+    color: `color-mix(in srgb, ${accents.primary} 62%, ${colors.text})`,
+  },
+  contextChipOff: {
+    borderColor: `color-mix(in srgb, ${colors.border} 92%, transparent)`,
+    backgroundColor: {
+      default: "transparent",
+      ":hover": `color-mix(in srgb, ${colors.panel} 70%, transparent)`,
+    },
+    color: colors.muted,
+  },
+  contextChipIcon: { width: "12px", height: "12px", flex: "none" },
+  contextChipLabel: { minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   sendButton: { width: "30px", height: "30px", flex: "none", borderRadius: "7px" },
   sendIcon: { width: "15px", height: "15px" },
   buttonIcon: { width: "13px", height: "13px" },

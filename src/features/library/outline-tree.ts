@@ -18,8 +18,8 @@ export function outlineLevel(depth: number, minDepth: number) {
 
 export function headingInset(level: number) {
   const maxIndentLevel = 4;
-  const baseInset = 14;
-  const insetStep = 18;
+  const baseInset = 4;
+  const insetStep = 12;
   return baseInset + Math.min(Math.max(level, 1) - 1, maxIndentLevel) * insetStep;
 }
 

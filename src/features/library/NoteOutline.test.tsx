@@ -189,8 +189,8 @@ describe("NoteOutline", () => {
     expect(items[1]).toHaveAttribute("data-depth", "1");
     expect(items[2]).toHaveAttribute("data-depth", "2");
     const rows = view.container.querySelectorAll("[data-outline-item]");
-    expect(rows[0]).toHaveAttribute("data-outline-inset", "14");
-    expect(rows[2]).toHaveAttribute("data-outline-inset", "32");
+    expect(rows[0]).toHaveAttribute("data-outline-inset", "4");
+    expect(rows[2]).toHaveAttribute("data-outline-inset", "16");
   });
 
   it("shows an empty state when the note has no headings", () => {

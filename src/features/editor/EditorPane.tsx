@@ -5,6 +5,7 @@ import {
   defaultKeymap,
   history,
   historyKeymap,
+  isolateHistory,
   indentWithTab,
   redo,
   redoDepth,
@@ -422,6 +423,7 @@ function createEditorExtensions(
 }
 
 export interface EditorHandle {
+  flushContent: () => string | null;
   getScrollElement: () => HTMLElement | null;
   getVisibleLine: (offset?: number) => number | null;
   scrollToLine: (line: number, offset?: number) => void;
@@ -435,6 +437,7 @@ export interface EditorHandle {
   selectAll: () => void;
   getSelectedText: () => string;
   getSelection: () => { from: number; to: number; text: string } | null;
+  getPositionRect: (position: number) => { left: number; right: number; top: number; bottom: number } | null;
   replaceRange: (from: number, to: number, text: string, expected: string) => boolean;
   cut: () => Promise<void>;
   copy: () => Promise<void>;
@@ -524,6 +527,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(function Edi
   useImperativeHandle(
     forwardedRef,
     () => ({
+      flushContent: () => hostRef.current?.flush() ?? null,
       getScrollElement: () => hostRef.current?.getView()?.scrollDOM || null,
       getVisibleLine: (offset = 0) => {
         const view = hostRef.current?.getView();
@@ -611,6 +615,16 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(function Edi
           text: view.state.sliceDoc(selection.from, selection.to),
         };
       },
+      getPositionRect: (position) => {
+        const view = hostRef.current?.getView();
+        if (!view || position < 0 || position > view.state.doc.length) return null;
+        const bounds = view.scrollDOM.getBoundingClientRect();
+        const rect = view.coordsAtPos(position);
+        // Keep the anchor at the editor edge when the insertion point scrolls out of view.
+        const left = Math.max(bounds.left, Math.min(rect?.left ?? bounds.left, bounds.right));
+        const top = Math.max(bounds.top, Math.min(rect?.top ?? bounds.top, bounds.bottom));
+        return { left, right: left, top, bottom: Math.max(top, Math.min(rect?.bottom ?? top, bounds.bottom)) };
+      },
       replaceRange: (from, to, text, expected) => {
         const view = hostRef.current?.getView();
         if (!view || from < 0 || to < from || to > view.state.doc.length) return false;
@@ -619,6 +633,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(function Edi
           changes: { from, to, insert: text },
           selection: EditorSelection.range(from, from + text.length),
           userEvent: "input.ai",
+          annotations: isolateHistory.of("full"),
         });
         view.focus();
         return true;

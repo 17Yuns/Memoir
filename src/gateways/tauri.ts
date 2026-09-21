@@ -1,3 +1,4 @@
+import { createTauriSpeechGateway } from "./speech";
 import type { AiConversation } from "../domain/ai";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open as openDialog, save as saveDialog } from "@tauri-apps/plugin-dialog";
@@ -329,6 +330,7 @@ export function createTauriGateways(): AppGateways {
   const workspace = new TauriWorkspaceGateway();
   return {
     workspace,
+    speech: createTauriSpeechGateway(),
     attachments: workspace,
     system: workspace,
     persistence: new TauriPersistenceGateway(),

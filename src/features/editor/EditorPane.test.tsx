@@ -100,6 +100,20 @@ describe("EditorPane context menu", () => {
     expect(view.container.querySelector(".cm-content")?.textContent).toContain("Hello");
   });
 
+  it("flushes live text before capture and isolates reviewed insertions in undo history", () => {
+    const onChange = vi.fn();
+    const ref = createRef<EditorHandle>();
+    render(<EditorPane content="Hello" fileName="hello.md" isDark={false} onChange={onChange} ref={ref} settings={DEFAULT_SETTINGS} />);
+    act(() => { ref.current?.insertRaw("typed "); });
+    const snapshot = ref.current?.flushContent();
+    expect(snapshot).toBe("typed Hello");
+    expect(onChange).toHaveBeenLastCalledWith(snapshot);
+    act(() => { ref.current?.replaceRange(6, 6, "speech ", ""); });
+    expect(ref.current?.flushContent()).toBe("typed speech Hello");
+    act(() => { ref.current?.undo(); });
+    expect(ref.current?.flushContent()).toBe("typed Hello");
+  });
+
   it("replaces a captured range only while its source is unchanged", async () => {
     const onChange = vi.fn();
     const ref = createRef<EditorHandle>();

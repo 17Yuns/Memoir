@@ -37,6 +37,7 @@ Memoir 是一款安静的桌面笔记本。把一个装满 `.md` / `.mdx` 的文
 
 ## 功能
 
+- **语音输入** — 本地 Whisper 转写，可使用已配置的云端 AI 整理分段；支持预览原文、编辑和撤销。首次下载约 181 MiB 模型，见 [语音输入说明](docs/speech-input.md)。
 - **你的文件夹，你的文件** — 工作区就是你选的文件夹。笔记始终是普通 Markdown / MDX。
 - **云同步** — 可选的 WebDAV、AWS S3 和 S3 兼容对象存储双向同步，支持 MinIO、R2、COS 等。
 - **Markdown 与 MDX** — GFM、KaTeX、Mermaid、任务列表，以及一组内置 MDX 组件。

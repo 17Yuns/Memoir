@@ -2,6 +2,15 @@ import { describe, expect, it } from "vitest";
 import { clampUiScale, DEFAULT_SETTINGS, mergeSettings, type AppSettings } from "./settings";
 
 describe("settings merge", () => {
+  it("migrates speech preferences and preserves disabled cleanup", () => {
+    expect(mergeSettings({}).speech).toEqual({ model: "small", language: "auto", organize: true });
+    expect(mergeSettings({ speech: { model: "base" } }).speech.model).toBe("base");
+    expect(mergeSettings({ speech: { model: "unknown" as AppSettings["speech"]["model"] } }).speech.model).toBe("small");
+    expect(mergeSettings({ speech: { language: "ja", organize: false } }).speech)
+      .toEqual({ model: "small", language: "ja", organize: false });
+    expect(mergeSettings({ speech: { language: "invalid" as AppSettings["speech"]["language"] } }).speech.language)
+      .toBe("auto");
+  });
   it("migrates old settings and preserves custom or disabled shortcuts", () => {
     expect(mergeSettings({}).shortcuts).toEqual(DEFAULT_SETTINGS.shortcuts);
     expect(mergeSettings({ shortcuts: { save: "Mod+Shift+KeyS", newNote: null } }).shortcuts)

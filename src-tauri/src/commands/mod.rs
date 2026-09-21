@@ -1,3 +1,5 @@
+mod speech;
+pub use speech::*;
 mod ai;
 mod app_state;
 mod sync;

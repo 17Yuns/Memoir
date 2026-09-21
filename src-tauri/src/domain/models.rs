@@ -434,6 +434,7 @@ impl Default for GeneralSettings {
 pub struct ShortcutSettings {
     pub save: Option<String>,
     pub new_note: Option<String>,
+    pub voice_input: Option<String>,
     pub open_settings: Option<String>,
     pub toggle_sidebar: Option<String>,
     pub toggle_focus: Option<String>,
@@ -447,6 +448,7 @@ impl Default for ShortcutSettings {
         Self {
             save: Some("Mod+KeyS".into()),
             new_note: Some("Mod+KeyN".into()),
+            voice_input: Some("Mod+Shift+KeyM".into()),
             open_settings: Some("Mod+Comma".into()),
             toggle_sidebar: Some("Mod+KeyB".into()),
             toggle_focus: Some("Mod+Shift+KeyF".into()),
@@ -457,8 +459,28 @@ impl Default for ShortcutSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct SpeechSettings {
+    pub model: super::speech::SpeechModel,
+    pub language: String,
+    pub organize: bool,
+}
+
+impl Default for SpeechSettings {
+    fn default() -> Self {
+        Self {
+            model: super::speech::SpeechModel::Small,
+            language: "auto".into(),
+            organize: true,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct AppSettings {
+    #[serde(default)]
+    pub speech: SpeechSettings,
     #[serde(default)]
     pub shortcuts: ShortcutSettings,
     #[serde(default)]

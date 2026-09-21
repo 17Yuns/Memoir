@@ -14,7 +14,7 @@ import {
   MIN_SIDEBAR_WIDTH,
   fitLayoutColumns,
 } from "../domain/layout";
-import type { EditorHandle } from "../features/editor/EditorPane";
+import type { EditorWorkspaceHandle } from "../features/editor/EditorWorkspace";
 import { LayoutResizeHandle } from "../features/layout/LayoutResizeHandle";
 import { LibrarySidebar } from "../features/library/LibrarySidebar";
 import { NoteList } from "../features/library/NoteList";
@@ -95,7 +95,7 @@ function WorkspaceLayout({
   const saveActiveNote = useAppStore((state) => state.saveActiveNote);
   const { openCreate, openCreateFolder, openRenameFolder, openDeleteFolder, openDelete, openRename, openMove } = useWorkspaceDialogs();
   const { t } = useI18n();
-  const editorRef = useRef<EditorHandle>(null);
+  const editorRef = useRef<EditorWorkspaceHandle>(null);
   const shellRef = useRef<HTMLElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [aiRewriteTarget, setAiRewriteTarget] = useState<AiRewriteTarget | null>(null);
@@ -196,6 +196,11 @@ function WorkspaceLayout({
       event.preventDefault();
       event.stopPropagation();
       switch (action) {
+        case "voiceInput":
+          if (!event.repeat && !document.querySelector('[role="dialog"][aria-modal="true"]')) {
+            editorRef.current?.activateSpeech();
+          }
+          break;
         case "save":
           void saveActiveNote();
           break;

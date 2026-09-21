@@ -37,6 +37,7 @@ Notes are ordinary files. You can open the same folder in git, VS Code, or any o
 
 ## Features
 
+- **Voice input** — Local Whisper transcription with optional cleanup using your configured AI model. Preview, edit, and undo insertion; download the 181 MiB model once. See [voice input](docs/speech-input.md).
 - **Your folder, your files** — the workspace is a folder you choose. Notes stay ordinary Markdown / MDX.
 - **Cloud sync** — optional two-way WebDAV, AWS S3, and S3-compatible storage such as MinIO, R2, or COS.
 - **Markdown and MDX** — GitHub Flavored Markdown, KaTeX, Mermaid, task lists, and a small set of built-in MDX components.

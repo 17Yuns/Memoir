@@ -1,0 +1,5 @@
+[env]
+# Release binaries must not inherit the CI machine's CPU-specific instruction set.
+GGML_NATIVE = "OFF"
+# whisper-rs includes generated bindings; avoid a libclang runtime dependency for builders.
+WHISPER_DONT_GENERATE_BINDINGS = "1"

@@ -279,6 +279,7 @@ export function NotePreviewArticle({
   exportMode = false,
   compileDelay = 350,
   onContentChange,
+  onOpenNote,
 }: {
   root: string | null;
   relativePath: string | null;
@@ -290,6 +291,7 @@ export function NotePreviewArticle({
   exportMode?: boolean;
   compileDelay?: number;
   onContentChange?: (content: string) => void;
+  onOpenNote?: (path: string) => void;
 }) {
   const { t } = useI18n();
   const { graph } = useNoteGraph();
@@ -316,8 +318,8 @@ export function NotePreviewArticle({
         : undefined,
     [onContentChange],
   );
-  const selectNoteRef = useRef(selectNote);
-  selectNoteRef.current = selectNote;
+  const selectNoteRef = useRef<(path: string) => void>(selectNote);
+  selectNoteRef.current = onOpenNote ?? selectNote;
   const components = useMemo(
     () =>
       previewComponents(

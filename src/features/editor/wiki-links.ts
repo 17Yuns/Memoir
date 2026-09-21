@@ -1,3 +1,4 @@
+import { wikiInsertToken } from "../../domain/wiki-link";
 import * as stylex from "@stylexjs/stylex";
 import { EditorState, Facet, Prec, StateEffect, StateField } from "@codemirror/state";
 import {
@@ -30,24 +31,7 @@ const wikiMatcher = new MatchDecorator({
   decoration: Decoration.mark({ class: "cm-wiki-link" }),
 });
 
-export function wikiInsertToken(
-  note: WikiCatalogNote,
-  catalog: WikiCatalogNote[],
-  query: string,
-  preferPath = false,
-) {
-  const stem = noteStem(note.relativePath);
-  const title = note.title.trim();
-  const titleCount = catalog.filter((item) => item.title === title).length;
-  if (preferPath || titleCount > 1 || !title) return stem;
-  const needle = query.trim().toLowerCase();
-  if (!needle) return title;
-  const path = note.relativePath.toLowerCase();
-  const stemLower = stem.toLowerCase();
-  if (stemLower.startsWith(needle) || path.startsWith(needle) || path.includes(`/${needle}`)) return stem;
-  if (title.toLowerCase().includes(needle)) return title;
-  return stem;
-}
+export { wikiInsertToken } from "../../domain/wiki-link";
 
 class WikiCompleteWidget extends WidgetType {
   constructor(
@@ -209,7 +193,7 @@ function insertWikiNote(
   preferPath = false,
 ) {
   const catalog = view.state.facet(wikiNoteCatalog);
-  const token = wikiInsertToken(note, catalog, query, preferPath);
+  const token = wikiInsertToken(note, catalog, query, preferPath, view.state.facet(wikiSourcePath));
   const after = view.state.doc.sliceString(to, Math.min(view.state.doc.length, to + 2));
   const insert = after === "]]" ? token : `${token}]]`;
   view.dispatch({

@@ -122,6 +122,42 @@ Practice note for the classic problem.
 See [[Welcome to Memoir]] for the vault layout.
 `,
   ],
+  ["回响/写作.md", `---
+title: 回响体验
+tags: [echo]
+---
+# 回响体验
+
+写作停顿时，回顾过去的笔记可以帮助我们发现新的联系，把零散的想法串起来。
+
+我已经引用过 [[../思考/连接.md]]，还想继续思考记忆与写作的关系。
+`],
+  ["思考/连接.md", `---
+title: 笔记之间的联系
+---
+# 笔记之间的联系
+
+写作不只是记录，回顾笔记能发现想法之间的联系。双链让思考沿着这些联系继续展开。
+
+- [ ] 再读一次 [[../阅读/记忆.md]]
+`],
+  ["阅读/记忆.md", `---
+title: 记忆
+---
+# 记忆
+
+回顾过去的笔记能够唤起记忆，写作时可以把旧的想法和新的观察放在一起。
+
+参见 [[../研究/记忆.md]]。
+`],
+  ["研究/记忆.md", `---
+title: 记忆
+---
+# 记忆
+
+写作中的记忆并非简单重放：我们在回顾笔记时重新组织想法，形成新的联系。
+`],
+
 ];
 
 function parseAiChatResponse(value: string, scope: AiRewriteTarget["scope"] | undefined, requireEnvelope = false): AiChatResponse {
@@ -575,12 +611,14 @@ export class BrowserWorkspaceGateway implements WorkspaceGateway {
     URL.revokeObjectURL(url);
   }
 
-  async getVectorIndexStatus(_root: string, _settings: AiSettings): Promise<VectorIndexStatus> {
-    return emptyVectorIndexStatus();
+  async getVectorIndexStatus(root: string, settings: AiSettings): Promise<VectorIndexStatus> {
+    this.assertRoot(root);
+    return emptyVectorIndexStatus({ enabled: settings.enabled, model: settings.embeddingModel,
+      totalNotes: this.files.size, indexedNotes: this.files.size, chunkCount: this.files.size, dimensions: 3 });
   }
 
-  async indexVectorWorkspace(_root: string, _settings: AiSettings): Promise<VectorIndexStatus> {
-    return emptyVectorIndexStatus();
+  async indexVectorWorkspace(root: string, settings: AiSettings): Promise<VectorIndexStatus> {
+    return this.getVectorIndexStatus(root, settings);
   }
 
   async semanticSearch(root: string, _settings: AiSettings, query: string, limit = 20): Promise<SemanticSearchResult[]> {
@@ -588,6 +626,17 @@ export class BrowserWorkspaceGateway implements WorkspaceGateway {
     const normalized = query.trim().toLocaleLowerCase();
     if (!normalized) return [];
     const terms = normalized.split(/\s+/).filter(Boolean);
+    if (/写作|笔记|记忆|writing|memory/.test(normalized) && /回响|写作|联系|记忆|writing|memory/.test(normalized)) {
+      // Deterministic offline retrieval fixture, including duplicate titles and an existing link.
+      return ["思考/连接.md", "阅读/记忆.md", "研究/记忆.md", "回响/写作.md"]
+        .filter((path) => this.files.has(path)).slice(0, limit).map((relativePath, index) => {
+          const content = this.files.get(relativePath)!;
+          const parsed = parseNote(content, relativePath);
+          return { relativePath, title: parsed.title, excerpt: parsed.excerpt,
+            content: parsed.body.split("\n\n").find((block) => /写作|回顾/.test(block) && !block.startsWith("#")) ?? parsed.body,
+            score: 0.92 - index * 0.08, chunkIndex: 0 };
+        });
+    }
     return [...this.files.entries()]
       .map(([relativePath, content]) => {
         const fileName = relativePath.split("/").pop() || relativePath;

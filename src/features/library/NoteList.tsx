@@ -13,7 +13,7 @@ import {
   Loader2,
   Upload,
 } from "lucide-react";
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ContextMenu,
   ContextMenuItem,
@@ -55,6 +55,7 @@ const VIRTUAL_ROW_COMFORTABLE = 104;
 const VIRTUAL_ROW_COMPACT = 88;
 
 export function NoteList({
+  echo,
   onCreate,
   onRename,
   onMove,
@@ -67,6 +68,7 @@ export function NoteList({
   onSaveAiRewrite = async () => false,
   style,
 }: {
+  echo?: ReactNode;
   onCreate: () => void;
   onRename: (path: string) => void;
   onMove: (path: string) => void;
@@ -287,7 +289,7 @@ export function NoteList({
           )}
         </div>
       ) : mode === "links" ? (
-        <NoteLinksPanel />
+        <NoteLinksPanel echo={echo} />
       ) : (
         <NoteOutline documentKey={activePath} headings={headings} />
       )}

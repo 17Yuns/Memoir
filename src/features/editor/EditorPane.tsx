@@ -1,3 +1,4 @@
+import { captureEchoContext, type EchoContext } from "../echo/editor-context";
 import * as stylex from "@stylexjs/stylex";
 import { markdown } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -423,6 +424,9 @@ function createEditorExtensions(
 }
 
 export interface EditorHandle {
+  captureEcho: () => EchoContext | null;
+  insertEcho: (snapshot: EchoContext, text: string) => boolean;
+  restoreEcho: (snapshot: EchoContext) => void;
   flushContent: () => string | null;
   getScrollElement: () => HTMLElement | null;
   getVisibleLine: (offset?: number) => number | null;
@@ -451,6 +455,7 @@ interface EditorPaneProps {
   isDark: boolean;
   fileName: string;
   onChange: (content: string) => void;
+  onEchoContext?: (context: EchoContext) => void;
   onScroll?: () => void;
   onScrollIntent?: () => void;
   onPasteImages?: (files: File[]) => Promise<string>;
@@ -468,6 +473,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(function Edi
     settings,
     isDark,
     onChange,
+    onEchoContext,
     onScroll,
     onScrollIntent,
     onPasteImages,
@@ -481,6 +487,27 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(function Edi
   forwardedRef,
 ) {
   const { t, tc, locale } = useI18n();
+  const echoVersion = useRef<object>({});
+  const echoCallback = useRef(onEchoContext);
+  echoCallback.current = onEchoContext;
+  const emitEcho = (view: EditorView, composing = view.composing) => {
+    echoCallback.current?.(captureEchoContext(view.state, sourcePath, echoVersion.current, composing));
+  };
+  const echoEmitRef = useRef(emitEcho);
+  echoEmitRef.current = emitEcho;
+  const echoExtensions = useMemo(() => [
+    EditorView.updateListener.of((update) => {
+      if (update.docChanged) echoVersion.current = {};
+      if (update.docChanged || update.selectionSet) echoEmitRef.current(update.view);
+    }),
+    EditorView.domEventHandlers({
+      compositionstart: (_event, view) => { echoEmitRef.current(view, true); },
+      compositionend: (_event, view) => {
+        // CM applies the final composition transaction before this microtask.
+        queueMicrotask(() => { if (hostRef.current?.getView() === view) echoEmitRef.current(view, false); });
+      },
+    }),
+  ], []);
   const hostRef = useRef<CodeMirrorHostHandle>(null);
   const [htmlDropActive, setHtmlDropActive] = useState(false);
   const dropDepthRef = useRef(0);
@@ -494,7 +521,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(function Edi
   onScrollIntentRef.current = onScrollIntent;
   const extensions = useMemo(
     () =>
-      createEditorExtensions(
+      [...createEditorExtensions(
         isDark,
         settings,
         callbacksRef.current.onPasteImages
@@ -508,8 +535,8 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(function Edi
           onOpenNote: (path) => callbacksRef.current.onOpenNote?.(path),
         },
         locale,
-      ),
-    [isDark, locale, settings, sourcePath, wikiCatalog],
+      ), ...echoExtensions],
+    [echoExtensions, isDark, locale, settings, sourcePath, wikiCatalog],
   );
   const statsContent = useDeferredValue(
     content,
@@ -527,6 +554,35 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(function Edi
   useImperativeHandle(
     forwardedRef,
     () => ({
+      captureEcho: () => {
+        const view = hostRef.current?.getView();
+        return view ? captureEchoContext(view.state, sourcePath, echoVersion.current, view.composing) : null;
+      },
+      insertEcho: (snapshot, text) => {
+        const view = hostRef.current?.getView();
+        if (!view || view.composing || snapshot.sourcePath !== sourcePath ||
+            snapshot.version !== echoVersion.current || snapshot.doc !== view.state.doc ||
+            snapshot.anchor !== view.state.selection.main.anchor || snapshot.head !== view.state.selection.main.head) return false;
+        view.dispatch({
+          changes: { from: snapshot.to, insert: text },
+          selection: EditorSelection.cursor(snapshot.to + text.length),
+          annotations: isolateHistory.of("full"),
+          userEvent: "input.echo",
+        });
+        hostRef.current?.flush();
+        view.focus();
+        return true;
+      },
+      restoreEcho: (snapshot) => {
+        const view = hostRef.current?.getView();
+        if (!view || snapshot.sourcePath !== sourcePath || snapshot.version !== echoVersion.current) return;
+        const top = view.scrollDOM.scrollTop;
+        const left = view.scrollDOM.scrollLeft;
+        view.dispatch({ selection: EditorSelection.range(snapshot.anchor, snapshot.head) });
+        view.focus();
+        view.scrollDOM.scrollTop = top;
+        view.scrollDOM.scrollLeft = left;
+      },
       flushContent: () => hostRef.current?.flush() ?? null,
       getScrollElement: () => hostRef.current?.getView()?.scrollDOM || null,
       getVisibleLine: (offset = 0) => {
@@ -687,6 +743,7 @@ export const EditorPane = forwardRef<EditorHandle, EditorPaneProps>(function Edi
         extensions={extensions}
         onChange={onChange}
         onCreateEditor={(view) => {
+          echoEmitRef.current(view);
           detachScrollRef.current?.();
           const handleScroll = () => onScrollRef.current?.();
           const handleScrollIntent = () => onScrollIntentRef.current?.();

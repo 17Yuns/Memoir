@@ -7,7 +7,7 @@ import { useAppStore } from "../../store/app-store";
 import { useI18n } from "../../i18n/react";
 import { linkStyles, sharedLibraryStyles } from "./library-styles.stylex";
 
-export function NoteLinksPanel() {
+export function NoteLinksPanel({ echo }: { echo?: ReactNode }) {
   const activePath = useAppStore((state) => state.activePath);
   const selectNote = useAppStore((state) => state.selectNote);
   const { graph } = useNoteGraph();
@@ -28,6 +28,7 @@ export function NoteLinksPanel() {
 
   return (
     <div {...stylex.props(linkStyles.panel, sharedLibraryStyles.fadeIn)}>
+      {echo}
       <LinkSection
         empty={t("links.emptyOutgoing")}
         icon={<ArrowUpRight {...stylex.props(sharedLibraryStyles.iconSmall)} />}

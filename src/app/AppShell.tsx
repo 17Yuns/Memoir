@@ -1,3 +1,5 @@
+import { EchoSession } from "../application/echo-session";
+import { EchoPanel } from "../features/echo/EchoPanel";
 import * as stylex from "@stylexjs/stylex";
 import { FolderOpen, Library, Menu, Pencil } from "lucide-react";
 import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -96,6 +98,8 @@ function WorkspaceLayout({
   const { openCreate, openCreateFolder, openRenameFolder, openDeleteFolder, openDelete, openRename, openMove } = useWorkspaceDialogs();
   const { t } = useI18n();
   const editorRef = useRef<EditorWorkspaceHandle>(null);
+  const [echo] = useState(() => new EchoSession((...args) => getGateways().workspace.semanticSearch(...args)));
+  useEffect(() => () => echo.pause(), [echo]);
   const shellRef = useRef<HTMLElement>(null);
   const [containerWidth, setContainerWidth] = useState(0);
   const [aiRewriteTarget, setAiRewriteTarget] = useState<AiRewriteTarget | null>(null);
@@ -282,6 +286,7 @@ function WorkspaceLayout({
           )}
         >
           <NoteList
+            echo={<EchoPanel session={echo} editorRef={editorRef} />}
             onMove={openMove}
             aiRewriteTarget={aiRewriteTarget}
             onCreate={() => openCreate()}
@@ -315,6 +320,7 @@ function WorkspaceLayout({
             <NoteGraphView />
           ) : (
             <EditorWorkspace
+              onEchoContext={echo.setContext}
               isDark={isDark}
               onDelete={openDelete}
               onRename={openRename}

@@ -1,3 +1,4 @@
+import type { EchoContext } from "../echo/editor-context";
 import * as stylex from "@stylexjs/stylex";
 import {
   Bold,
@@ -102,12 +103,14 @@ export interface EditorWorkspaceHandle extends EditorHandle {
 
 export const EditorWorkspace = forwardRef<EditorWorkspaceHandle, {
   isDark: boolean;
+  onEchoContext?: (context: EchoContext) => void;
   onRename: () => void;
   onDelete: () => void;
   style?: stylex.StyleXStyles;
 }>(function EditorWorkspace(
   {
     isDark,
+    onEchoContext,
     onRename,
     onDelete,
     style,
@@ -462,6 +465,9 @@ export const EditorWorkspace = forwardRef<EditorWorkspaceHandle, {
     forwardedRef,
     () => ({
       activateSpeech,
+      captureEcho: () => editorRef.current?.captureEcho() ?? null,
+      insertEcho: (snapshot, text) => editorRef.current?.insertEcho(snapshot, text) ?? false,
+      restoreEcho: (snapshot) => editorRef.current?.restoreEcho(snapshot),
       flushContent: () => editorRef.current?.flushContent() ?? null,
       getScrollElement: () => editorRef.current?.getScrollElement() ?? null,
       getVisibleLine: (offset) => editorRef.current?.getVisibleLine(offset) ?? null,
@@ -759,6 +765,7 @@ export const EditorWorkspace = forwardRef<EditorWorkspaceHandle, {
                   isDark={isDark}
                   key={loadedContentPath || ""}
                   onChange={handleEditorChange}
+                  onEchoContext={onEchoContext}
                   highlightDrop={nativeDropActive}
                   onContextMenu={openEditorMenu}
                   onOpenNote={(path) => void selectNote(path)}

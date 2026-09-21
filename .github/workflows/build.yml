@@ -140,7 +140,8 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
           shared-key: ${{ matrix.name }}
-          prefix-key: v1-rust
+          # Discard whisper artifacts built with bundled Linux bindings / macOS 10.13.
+          prefix-key: v2-whisper-bindings
           # Cleaning workspace crate-types (rlib/staticlib/cdylib) can drop
           # dependency rlibs while leaving their fingerprints intact.
           cache-all-crates: true
@@ -159,6 +160,25 @@ jobs:
             patchelf \
             xdg-utils \
             rpm
+
+      - name: Configure Windows libclang
+        if: matrix.family == 'windows'
+        shell: pwsh
+        run: |
+          $llvmBin = Join-Path $env:ProgramFiles 'LLVM\bin'
+          if (-not (Test-Path (Join-Path $llvmBin 'libclang.dll'))) {
+            throw "libclang.dll missing from $llvmBin"
+          }
+          "LIBCLANG_PATH=$llvmBin" >> $env:GITHUB_ENV
+
+      - name: Configure macOS libclang and SDK
+        if: matrix.family == 'macos'
+        run: |
+          clang_path="$(xcrun --find clang)"
+          libclang_path="$(dirname "$clang_path")/../lib"
+          test -f "$libclang_path/libclang.dylib"
+          echo "LIBCLANG_PATH=$libclang_path" >> "$GITHUB_ENV"
+          echo "SDKROOT=$(xcrun --sdk macosx --show-sdk-path)" >> "$GITHUB_ENV"
 
       - name: Install frontend dependencies
         run: bun install --frozen-lockfile

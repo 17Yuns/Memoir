@@ -105,6 +105,10 @@ AppImage 无需安装即可运行，首次使用前请先执行：`chmod +x memo
 - [Bun](https://bun.sh) 1.3+
 - [Rust](https://www.rust-lang.org/tools/install)（仅桌面端需要）
 - Tauri 2 的[系统依赖](https://v2.tauri.app/start/prerequisites/)
+- 桌面端语音识别需要 CMake 和 [libclang](https://rust-lang.github.io/rust-bindgen/requirements.html)。Windows 安装 LLVM，并将 `LIBCLANG_PATH` 设为 `C:\Program Files\LLVM\bin`；macOS 使用 Xcode 自带的 libclang；Debian/Ubuntu 安装 `cmake libclang-dev`。
+- macOS 桌面构建要求 macOS 11.0 或更高版本。
+
+不要设置 `WHISPER_DONT_GENERATE_BINDINGS`：whisper 附带的绑定包含 Linux libc 类型布局。如果旧版本配置设置过该变量，更新后执行一次 `cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys`，以重新生成绑定。
 
 ```bash
 git clone https://github.com/Memoir-Studio/Memoir.git

@@ -70,7 +70,7 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
           shared-key: rust-test
-          prefix-key: v1-rust
+          prefix-key: v2-whisper-bindings
           cache-all-crates: true
 
       - name: Install Linux test dependencies

@@ -105,6 +105,10 @@ Open the app, then choose a folder of Markdown / MDX files. That folder is the w
 - [Bun](https://bun.sh) 1.3+
 - [Rust](https://www.rust-lang.org/tools/install) (desktop app only)
 - Tauri 2 [system dependencies](https://v2.tauri.app/start/prerequisites/)
+- CMake and [libclang](https://rust-lang.github.io/rust-bindgen/requirements.html) for desktop speech recognition. On Windows, install LLVM and set `LIBCLANG_PATH` to `C:\Program Files\LLVM\bin`; on macOS, use Xcode's libclang; on Debian/Ubuntu, install `cmake libclang-dev`.
+- macOS desktop builds target macOS 11.0 or later.
+
+Do not set `WHISPER_DONT_GENERATE_BINDINGS`: whisper's bundled bindings contain Linux libc layouts. After updating from a checkout that set it, run `cargo clean --manifest-path src-tauri/Cargo.toml -p whisper-rs-sys` once to regenerate bindings.
 
 ```bash
 git clone https://github.com/Memoir-Studio/Memoir.git

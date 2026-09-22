@@ -574,4 +574,21 @@ describe("PreviewPane images", () => {
       "/notes/attachments/截图.png",
     );
   });
+
+  it("serves local images from Windows extended-length workspace paths", () => {
+    const view = render(
+      <PreviewPane
+        activePath="readme.md"
+        content="![截图](attachments/截图.png)"
+        note={{ ...note, relativePath: "readme.md", fileName: "readme.md", title: "Readme" }}
+        onContentChange={() => undefined}
+        root={String.raw`\\?\D:\projects\notes`}
+      />,
+    );
+
+    expect(view.getByRole("img", { name: "截图" })).toHaveAttribute(
+      "src",
+      "D:/projects/notes/attachments/截图.png",
+    );
+  });
 });

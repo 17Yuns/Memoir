@@ -19,6 +19,21 @@ describe("workspace paths", () => {
     );
   });
 
+  it("normalizes Windows extended-length workspace roots for media URLs", () => {
+    expect(
+      resolveWorkspaceFilePath(
+        String.raw`\\?\D:\projects\notes`,
+        "attachments/截图.png",
+      ),
+    ).toBe("D:/projects/notes/attachments/截图.png");
+    expect(
+      resolveWorkspaceFilePath(
+        String.raw`\\?\UNC\server\share\notes`,
+        "attachments/photo.png",
+      ),
+    ).toBe("//server/share/notes/attachments/photo.png");
+  });
+
   it("builds markdown-relative paths from the note directory", () => {
     expect(noteDirectory("welcome.md")).toBe("");
     expect(noteDirectory("日记/today.md")).toBe("日记");

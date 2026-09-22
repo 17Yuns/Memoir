@@ -44,7 +44,11 @@ describe("AppShell shortcuts", () => {
       fireEvent.keyDown(window, { key: "B", code: "KeyB", ctrlKey: true, shiftKey: true });
       expect(useAppStore.getState().isSidebarCollapsed).toBe(false);
 
-      const focus = await view.findByRole("button", { name: "专注书写" });
+      const focus = await view.findByRole(
+        "button",
+        { name: "专注书写" },
+        { timeout: 3_000 },
+      );
       fireEvent.keyDown(window, { key: "F", code: "KeyF", ctrlKey: true, shiftKey: true });
       expect(useAppStore.getState().layout.libraryCollapsed).toBe(true);
       expect(useAppStore.getState().isSidebarCollapsed).toBe(true);

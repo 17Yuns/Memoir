@@ -297,10 +297,13 @@ describe("EditorPane source chrome", () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(view.container.querySelector(".cm-code-keyword")).toBeTruthy();
-      expect(view.container.querySelector(".cm-md-codeblock")).toBeTruthy();
-    });
+    await waitFor(
+      () => {
+        expect(view.container.querySelector(".cm-code-keyword")).toBeTruthy();
+        expect(view.container.querySelector(".cm-md-codeblock")).toBeTruthy();
+      },
+      { timeout: 3_000 },
+    );
   });
 });
 

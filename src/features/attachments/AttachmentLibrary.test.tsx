@@ -39,6 +39,29 @@ describe("AttachmentLibrary", () => {
     expect(onInsert).toHaveBeenCalledWith("![paste-1](../attachments/paste-1.png)");
   });
 
+  it("serves thumbnails from Windows extended-length workspace paths", () => {
+    useAppStore.setState({
+      workspaceRoot: String.raw`\\?\D:\projects\notes`,
+      activePath: "today.md",
+      attachments: [
+        {
+          relativePath: "attachments/截图.png",
+          fileName: "截图.png",
+          extension: "png",
+          mimeType: "image/png",
+          modifiedMs: 1,
+          size: 12,
+        },
+      ],
+    });
+
+    const view = render(<AttachmentLibrary />);
+    expect(view.container.querySelector("img")).toHaveAttribute(
+      "src",
+      "D:/projects/notes/attachments/截图.png",
+    );
+  });
+
   it("asks for an open note before inserting", async () => {
     useAppStore.setState({
       workspaceRoot: "/notes",

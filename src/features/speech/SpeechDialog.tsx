@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useImperativeHandle, useState, useSyncEx
 import { createPortal } from "react-dom";
 import { Button, IconButton, SegmentedControl } from "../../components/ui";
 import { SpeechSession } from "../../application/speech/speech-session";
+import { buildSpeechContext } from "../../application/speech/speech-context";
 import type { SpeechTarget } from "../../domain/speech";
 import { getGateways } from "../../gateways";
 import { useI18n } from "../../i18n/react";
@@ -34,7 +35,7 @@ export function SpeechDialog({ ref, target, getAnchor, anchorElement, onClose, o
   const root = useAppStore((store) => store.workspaceRoot);
   const content = useAppStore((store) => store.content);
   const viewMode = useAppStore((store) => store.viewMode);
-  const [options] = useState(() => ({ ...useAppStore.getState().settings.speech, ai }));
+  const [options] = useState(() => ({ ...useAppStore.getState().settings.speech, ai, context: buildSpeechContext(target) }));
   const [insertError, setInsertError] = useState(false);
   const busy = !["idle", "ready"].includes(state.phase);
   const targetChanged = activePath !== target.path || root !== target.root || content !== target.content || viewMode === "preview";

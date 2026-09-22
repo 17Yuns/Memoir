@@ -1,6 +1,6 @@
 use super::speech_recognition;
 use crate::domain::{
-    speech::{speech_error, SpeechTranscript},
+    speech::{speech_error, SpeechModel, SpeechTranscript},
     AppResult,
 };
 use std::{
@@ -17,6 +17,7 @@ const IDLE_TIMEOUT: Duration = Duration::from_secs(120);
 struct Inference {
     samples: Vec<f32>,
     language: String,
+    context: String,
     cancelled: Arc<AtomicBool>,
     progress: Box<dyn Fn(u32) + Send>,
 }
@@ -35,13 +36,15 @@ enum Command {
 /// Only model weights are cached; each inference creates fresh state so no previous text remains.
 pub struct SpeechWorker {
     model: PathBuf,
+    model_kind: SpeechModel,
     sender: Mutex<Option<mpsc::Sender<Command>>>,
 }
 
 impl SpeechWorker {
-    pub fn new(model: PathBuf) -> Self {
+    pub fn new(model: PathBuf, model_kind: SpeechModel) -> Self {
         Self {
             model,
+            model_kind,
             sender: Mutex::new(None),
         }
     }
@@ -56,6 +59,7 @@ impl SpeechWorker {
             if sender.is_none() {
                 let (tx, rx) = mpsc::channel();
                 let model = self.model.clone();
+                let model_kind = self.model_kind;
                 std::thread::Builder::new()
                     .name("memoir-speech-model".into())
                     .spawn(move || {
@@ -68,6 +72,8 @@ impl SpeechWorker {
                                     context,
                                     &request.samples,
                                     &request.language,
+                                    &request.context,
+                                    model_kind,
                                     request.cancelled,
                                     request.progress,
                                 )
@@ -108,6 +114,7 @@ impl SpeechWorker {
         &self,
         samples: Vec<f32>,
         language: String,
+        context: String,
         cancelled: Arc<AtomicBool>,
         progress: impl Fn(u32) + Send + 'static,
     ) -> AppResult<SpeechTranscript> {
@@ -117,6 +124,7 @@ impl SpeechWorker {
             Inference {
                 samples,
                 language,
+                context,
                 cancelled,
                 progress: Box::new(progress),
             },
@@ -252,6 +260,7 @@ mod tests {
             Inference {
                 samples: vec![0.1; 16000],
                 language: "en".into(),
+                context: String::new(),
                 cancelled,
                 progress: Box::new(|_| {}),
             },

@@ -26,6 +26,16 @@ function fixture() {
 afterEach(() => vi.useRealTimers());
 
 describe("speech session", () => {
+  it("freezes note hints at recording start and sends them only to local recognition", async () => {
+    const { session, gateway, options } = fixture();
+    const recording = { ...options, context: "字节跳动，推理基础设施，灰度发布" };
+    await session.initialize(); await session.start(recording);
+    recording.context = "another note";
+    await session.stop();
+    expect(gateway.stop).toHaveBeenCalledWith(expect.any(String), "zh", "字节跳动，推理基础设施，灰度发布");
+    expect(gateway.format).toHaveBeenCalledWith(options.ai, "今天嗯做两件事。");
+    session.dispose();
+  });
   it("does not auto-start if closed while checking the model", async () => {
     const { session, gateway, options } = fixture();
     const model = deferred<{ ready: boolean; model: string; bytes: number }>();

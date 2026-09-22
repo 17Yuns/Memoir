@@ -5,12 +5,14 @@ import { IconButton, SegmentedControl, Toggle } from "../../components/ui";
 import { noteStem } from "../../domain/note-links";
 import { useAppStore } from "../../store/app-store";
 import { useI18n } from "../../i18n/react";
+import { isTauriRuntime } from "../../platform/runtime";
 import { degreesFromEdges } from "./force-layout";
 import { NoteGraphScene } from "./graph-scene";
 import { graphCardMarker, graphStyles } from "./graph-styles.stylex";
 import { themeFromAppearance } from "./graph-theme";
 import { useNoteGraph } from "./useNoteGraph";
 import { WindowControls } from "../window/WindowChrome";
+import { handleWindowDragMouseDown } from "../window/window-drag";
 
 export default function NoteGraphView() {
   const activePath = useAppStore((state) => state.activePath);
@@ -117,14 +119,18 @@ export default function NoteGraphView() {
 
   return (
     <section aria-label={t("graph.label")} {...stylex.props(graphStyles.view)}>
-      <header {...stylex.props(graphStyles.header)}>
+      <header
+        data-tauri-drag-region={isTauriRuntime() ? "" : undefined}
+        onMouseDown={handleWindowDragMouseDown}
+        {...stylex.props(graphStyles.header)}
+      >
         <div {...stylex.props(graphStyles.minWidth)}>
           <h2 {...stylex.props(graphStyles.heading)}>
             {t("graph.label")}
           </h2>
           <p {...stylex.props(graphStyles.subtitle)}>{t("graph.hint")}</p>
         </div>
-        <div {...stylex.props(graphStyles.headerActions)}>
+        <div data-window-drag="ignore" {...stylex.props(graphStyles.headerActions)}>
           <SegmentedControl
             display="icon-text"
             label={t("graph.all")}

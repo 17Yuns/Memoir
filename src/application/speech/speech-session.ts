@@ -4,6 +4,7 @@ import { MAX_RECORDING_SECONDS, type SpeechLanguage, type SpeechModel, type Spee
 import type { SpeechGateway } from "../../gateways/contracts";
 
 export type SpeechPhase = "checking" | "idle" | "downloading" | "starting" | "recording" | "transcribing" | "formatting" | "ready";
+type RecordingOptions = { language: SpeechLanguage; ai: AiSettings; organize: boolean; context?: string };
 export type SpeechState = {
   phase: SpeechPhase;
   model: SpeechModelStatus | null;
@@ -30,7 +31,7 @@ export class SpeechSession {
   private requestId: string | null = null;
   private unlisten?: () => void;
   private timer?: ReturnType<typeof setInterval>;
-  private options?: { language: SpeechLanguage; ai: AiSettings; organize: boolean };
+  private options?: RecordingOptions;
 
   constructor(readonly gateway: SpeechGateway, readonly model: SpeechModel = "small") {}
   snapshot = () => this.state;
@@ -44,7 +45,7 @@ export class SpeechSession {
   private clearTimer() { if (this.timer) clearInterval(this.timer); this.timer = undefined; }
   private cancelNative(id: string) { void this.gateway.cancel(id).catch(() => undefined); }
 
-  async initialize(recordingOptions?: { language: SpeechLanguage; ai: AiSettings; organize: boolean }) {
+  async initialize(recordingOptions?: RecordingOptions) {
     this.disposed = false;
     const generation = ++this.generation;
     if (!this.gateway.available) { this.update({ phase: "idle", error: "speech.desktopOnly" }); return; }
@@ -80,7 +81,7 @@ export class SpeechSession {
     } finally { if (this.valid(generation)) this.requestId = null; }
   }
 
-  async start(options: { language: SpeechLanguage; ai: AiSettings; organize: boolean }) {
+  async start(options: RecordingOptions) {
     if (!this.state.model?.ready || !["idle", "ready"].includes(this.state.phase)) return;
     const generation = ++this.generation;
     const id = crypto.randomUUID();
@@ -111,7 +112,7 @@ export class SpeechSession {
     const options = this.options;
     this.update({ phase: "transcribing", progress: 0 });
     try {
-      const transcript = await this.gateway.stop(id, options.language);
+      const transcript = await this.gateway.stop(id, options.language, options.context);
       if (!this.valid(generation)) return;
       this.requestId = null;
       this.update({ transcript, originalDraft: transcript.text, draft: transcript.text, variant: "original", phase: "ready" });

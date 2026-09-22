@@ -1,6 +1,6 @@
 use crate::domain::speech::speech_error;
 use crate::domain::{
-    speech::{SpeechTranscript, TranscriptSegment, SAMPLE_RATE},
+    speech::{SpeechModel, SpeechTranscript, TranscriptSegment, SAMPLE_RATE},
     AppResult,
 };
 use std::{
@@ -76,6 +76,8 @@ pub fn transcribe_with_context(
     context: &WhisperContext,
     samples: &[f32],
     language: &str,
+    context_hint: &str,
+    model: SpeechModel,
     cancelled: Arc<AtomicBool>,
     progress: impl Fn(u32) + Send + 'static,
 ) -> AppResult<SpeechTranscript> {
@@ -84,7 +86,29 @@ pub fn transcribe_with_context(
     let mut state = context
         .create_state()
         .map_err(|_| speech_error("transcribeError"))?;
-    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    // Prompt tokens borrow our allocation; set_initial_prompt in whisper-rs 0.16
+    // leaks its CString. Context is per request and never retained in the worker.
+    let prompt = recognition_prompt(language, context_hint);
+    let mut prompt_tokens = if !prompt.is_empty() {
+        context
+            .tokenize(&prompt, prompt.len() + 1)
+            .map_err(|_| speech_error("transcribeError"))?
+    } else {
+        Vec::new()
+    };
+    // Whisper only keeps half of its text context as a prompt. Bound it explicitly
+    // so lengthy notes cannot displace the language hint or inflate decoding work.
+    prompt_tokens.truncate(192.min(context.n_text_ctx() as usize / 2));
+    let mut params = FullParams::new(match model {
+        SpeechModel::Small => SamplingStrategy::BeamSearch {
+            beam_size: 3,
+            patience: -1.0,
+        },
+        SpeechModel::Base => SamplingStrategy::Greedy { best_of: 1 },
+    });
+    if !prompt_tokens.is_empty() {
+        params.set_tokens(&prompt_tokens);
+    }
     params.set_n_threads(std::thread::available_parallelism().map_or(4, |n| n.get().min(8)) as i32);
     params.set_language(Some(language));
     params.set_translate(false);
@@ -125,6 +149,23 @@ pub fn transcribe_with_context(
             });
         }
     }
+    let chinese = language == "zh"
+        || (language == "auto"
+            && Some(state.full_lang_id_from_state()) == whisper_rs::get_lang_id("zh"));
+    assemble_transcript(segments, chinese)
+}
+
+fn assemble_transcript(
+    mut segments: Vec<TranscriptSegment>,
+    chinese: bool,
+) -> AppResult<SpeechTranscript> {
+    // Normalize before preview and optional cloud cleanup, including offline use.
+    // Do not convert Japanese kanji or other languages that also use Han characters.
+    if chinese {
+        for segment in &mut segments {
+            segment.text = simplet2s::convert(&segment.text);
+        }
+    }
     let text = segments
         .iter()
         .map(|segment| segment.text.as_str())
@@ -134,6 +175,29 @@ pub fn transcribe_with_context(
         return Err(speech_error("noSpeech"));
     }
     Ok(SpeechTranscript { text, segments })
+}
+
+fn recognition_prompt(language: &str, context_hint: &str) -> String {
+    // Also bound/sanitize at the native boundary, independently of the UI.
+    let hint: String = context_hint
+        .chars()
+        .take(384)
+        .map(|character| {
+            if character.is_control() {
+                ' '
+            } else {
+                character
+            }
+        })
+        .collect();
+    if language == "zh" {
+        format!(
+            "以下是简体中文的语音记录。{}",
+            simplet2s::convert(hint.trim())
+        )
+    } else {
+        hint.trim().to_string()
+    }
 }
 
 #[cfg(test)]
@@ -146,12 +210,93 @@ fn transcribe(
 ) -> AppResult<SpeechTranscript> {
     validate_input(samples, language, &cancelled)?;
     let context = load_model(model)?;
-    transcribe_with_context(&context, samples, language, cancelled, progress)
+    transcribe_with_context(
+        &context,
+        samples,
+        language,
+        "",
+        SpeechModel::Small,
+        cancelled,
+        progress,
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn prompts_bound_native_input_and_preserve_language_choice() {
+        assert_eq!(recognition_prompt("auto", ""), "");
+        assert_eq!(
+            recognition_prompt("en", "Rust\0API\nKubernetes"),
+            "Rust API Kubernetes"
+        );
+        assert_eq!(recognition_prompt("ja", "図書館"), "図書館");
+        assert!(
+            recognition_prompt("zh", "字節跳動，推理基礎設施").ends_with("字节跳动，推理基础设施")
+        );
+        let long = recognition_prompt("auto", &"𠮷".repeat(1000));
+        assert_eq!(long.chars().count(), 384);
+    }
+
+    #[test]
+    fn chinese_transcript_and_segments_use_simplified_characters() {
+        let result = assemble_transcript(
+            vec![
+                TranscriptSegment {
+                    start_ms: 10,
+                    end_ms: 200,
+                    text: "字節挑動，軟體開發。".into(),
+                },
+                TranscriptSegment {
+                    start_ms: 210,
+                    end_ms: 500,
+                    text: "Rust API 2026，乾隆與乾燥。".into(),
+                },
+            ],
+            true,
+        )
+        .unwrap();
+        // Script conversion must not guess a homophone correction.
+        assert_eq!(
+            result.text,
+            "字节挑动，软体开发。\nRust API 2026，乾隆与干燥。"
+        );
+        assert_eq!(result.segments[0].text, "字节挑动，软体开发。");
+        assert_eq!(
+            (result.segments[0].start_ms, result.segments[0].end_ms),
+            (10, 200)
+        );
+        assert_eq!(
+            (result.segments[1].start_ms, result.segments[1].end_ms),
+            (210, 500)
+        );
+    }
+
+    #[test]
+    fn other_languages_keep_their_original_characters() {
+        let original = "図書館で勉強する。中文學習 / English 123";
+        let result = assemble_transcript(
+            vec![TranscriptSegment {
+                start_ms: 0,
+                end_ms: 100,
+                text: original.into(),
+            }],
+            false,
+        )
+        .unwrap();
+        assert_eq!(result.text, original);
+        assert_eq!(result.segments[0].text, original);
+    }
+
+    #[test]
+    fn empty_transcript_is_still_rejected() {
+        assert_eq!(
+            assemble_transcript(Vec::new(), true).unwrap_err().message,
+            "speech.noSpeech"
+        );
+    }
     #[test]
     fn abort_callback_reads_the_live_cancellation_flag() {
         let cancelled = Arc::new(AtomicBool::new(false));
@@ -234,7 +379,8 @@ mod smoke {
     #[ignore = "set MEMOIR_WHISPER_MODEL and MEMOIR_WHISPER_SAMPLE to official model/jfk.wav paths"]
     fn transcribes_official_audio_sample() {
         let (model, samples) = fixture();
-        let worker = crate::infrastructure::speech_worker::SpeechWorker::new(model);
+        let worker =
+            crate::infrastructure::speech_worker::SpeechWorker::new(model, SpeechModel::Small);
         worker.prepare("smoke", Arc::new(AtomicBool::new(false)));
         let progress_count = Arc::new(std::sync::atomic::AtomicUsize::new(0));
         let progress = progress_count.clone();
@@ -242,6 +388,7 @@ mod smoke {
             .transcribe(
                 samples.clone(),
                 "en".into(),
+                String::new(),
                 Arc::new(AtomicBool::new(false)),
                 move |_| {
                     progress.fetch_add(1, Ordering::Relaxed);
@@ -253,15 +400,22 @@ mod smoke {
         let cancelled = Arc::new(AtomicBool::new(false));
         let cancel_during_inference = cancelled.clone();
         let error = worker
-            .transcribe(samples.clone(), "en".into(), cancelled, move |_| {
-                cancel_during_inference.store(true, Ordering::Relaxed);
-            })
+            .transcribe(
+                samples.clone(),
+                "en".into(),
+                String::new(),
+                cancelled,
+                move |_| {
+                    cancel_during_inference.store(true, Ordering::Relaxed);
+                },
+            )
             .unwrap_err();
         assert_eq!(error.message, "speech.cancelled");
         let repeated = worker
             .transcribe(
                 samples,
                 "en".into(),
+                String::new(),
                 Arc::new(AtomicBool::new(false)),
                 |_| {},
             )
@@ -312,6 +466,8 @@ mod smoke {
                         &context,
                         &samples,
                         "en",
+                        "",
+                        SpeechModel::Small,
                         Arc::new(AtomicBool::new(false)),
                         |_| {},
                     )

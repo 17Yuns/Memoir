@@ -8,7 +8,7 @@ import { createMockGateways } from "../../test/mock-gateways";
 import { setGatewaysForTests } from "../../gateways";
 import { useAppStore } from "../../store/app-store";
 
-function setup({ ready = true, organize = true, microphoneError = false, model = "small" as "small" | "base" } = {}) {
+function setup({ ready = true, organize = true, microphoneError = false, content = "old", model = "small" as "small" | "base" } = {}) {
   const gateways = createMockGateways();
   gateways.speech = {
     available: true, modelStatus: vi.fn().mockResolvedValue({ ready, model: "small", bytes: 190085487 }),
@@ -19,11 +19,11 @@ function setup({ ready = true, organize = true, microphoneError = false, model =
   };
   if (microphoneError) vi.mocked(gateways.speech.start).mockRejectedValueOnce(new Error("speech.microphoneError"));
   setGatewaysForTests(gateways);
-  useAppStore.setState({ workspaceRoot: "/notes", activePath: "one.md", content: "old", viewMode: "split", settings: { ...DEFAULT_SETTINGS, speech: { model, language: "en", organize }, ai: { ...DEFAULT_SETTINGS.ai, enabled: true } } });
+  useAppStore.setState({ workspaceRoot: "/notes", activePath: "one.md", content, viewMode: "split", settings: { ...DEFAULT_SETTINGS, speech: { model, language: "en", organize }, ai: { ...DEFAULT_SETTINGS.ai, enabled: true } } });
   const insert = vi.fn().mockReturnValue(true);
   const close = vi.fn();
   const getAnchor = vi.fn(() => ({ left: 320, right: 320, top: 200, bottom: 220 }));
-  const view = render(<StrictMode><SpeechDialog target={{ root: "/notes", path: "one.md", content: "old", from: 0 }} getAnchor={getAnchor} onClose={close} onInsert={insert} /></StrictMode>);
+  const view = render(<StrictMode><SpeechDialog target={{ root: "/notes", path: "one.md", content, from: content.length }} getAnchor={getAnchor} onClose={close} onInsert={insert} /></StrictMode>);
   return { view, gateways, insert, close, getAnchor, user: userEvent.setup() };
 }
 afterEach(() => {
@@ -32,6 +32,13 @@ afterEach(() => {
 });
 
 describe("SpeechDialog", () => {
+  it("passes the insertion note context into local transcription only", async () => {
+    const { view, gateways, user } = setup({ content: "# 技术简历\n字节跳动，推理基础设施平台，灰度发布。" });
+    await user.click(await view.findByRole("button", { name: "停止并转写" }));
+    await waitFor(() => expect(gateways.speech.format).toHaveBeenCalled());
+    expect(gateways.speech.stop).toHaveBeenCalledWith(expect.any(String), "en", expect.stringContaining("推理基础设施平台"));
+    expect(gateways.speech.format).toHaveBeenCalledWith(expect.any(Object), "原始文字");
+  });
   it("keeps the editor interactive without stealing focus or cancelling on outside clicks", async () => {
     const editor = document.createElement("textarea");
     document.body.append(editor);
@@ -76,7 +83,7 @@ describe("SpeechDialog", () => {
     await view.findByRole("textbox", { name: "转写结果" });
     expect(gateways.speech.start).toHaveBeenCalledTimes(1);
     expect(gateways.speech.start).toHaveBeenCalledWith(expect.any(String), "base");
-    expect(gateways.speech.stop).toHaveBeenCalledWith(expect.any(String), "en");
+    expect(gateways.speech.stop).toHaveBeenCalledWith(expect.any(String), "en", "one\nold");
     expect(gateways.speech.format).not.toHaveBeenCalled();
     expect(view.queryByRole("combobox")).not.toBeInTheDocument();
     expect(view.queryByRole("switch")).not.toBeInTheDocument();

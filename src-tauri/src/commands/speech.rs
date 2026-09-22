@@ -65,19 +65,25 @@ pub async fn stop_speech_recording(
     service: State<'_, SpeechService>,
     request_id: String,
     language: String,
+    context: Option<String>,
 ) -> Result<SpeechTranscript, AppError> {
     let service = service.inner().clone();
     tauri::async_runtime::spawn_blocking(move || {
-        service.stop(&request_id.clone(), language, move |progress| {
-            let _ = app.emit(
-                "speech-progress",
-                SpeechProgress {
-                    request_id: request_id.clone(),
-                    stage: "transcribing",
-                    progress,
-                },
-            );
-        })
+        service.stop(
+            &request_id.clone(),
+            language,
+            context.unwrap_or_default(),
+            move |progress| {
+                let _ = app.emit(
+                    "speech-progress",
+                    SpeechProgress {
+                        request_id: request_id.clone(),
+                        stage: "transcribing",
+                        progress,
+                    },
+                );
+            },
+        )
     })
     .await
     .map_err(|_| speech_error("transcribeError"))?

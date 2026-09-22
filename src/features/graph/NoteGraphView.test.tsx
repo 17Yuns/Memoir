@@ -1,10 +1,20 @@
 import { cleanup, render, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { setGatewaysForTests } from "../../gateways";
 import { useAppStore } from "../../store/app-store";
 import { createMockGateways } from "../../test/mock-gateways";
 import NoteGraphView from "./NoteGraphView";
+
+const { startWindowDragging } = vi.hoisted(() => ({
+  startWindowDragging: vi.fn(),
+}));
+
+vi.mock("../../platform/window", () => ({
+  performWindowAction: vi.fn(),
+  startWindowResize: vi.fn(),
+  startWindowDragging,
+}));
 
 function note(relativePath: string, title: string) {
   return {
@@ -23,6 +33,8 @@ function note(relativePath: string, title: string) {
 afterEach(() => {
   cleanup();
   setGatewaysForTests(null);
+  Reflect.deleteProperty(window, "__TAURI_INTERNALS__");
+  startWindowDragging.mockClear();
   useAppStore.setState({
     workspaceRoot: null,
     notes: [],
@@ -102,5 +114,26 @@ describe("NoteGraphView", () => {
       );
       expect(ids.sort()).toEqual(["one.md", "two.md"]);
     });
+  });
+
+  it("drags the window from the graph header and leaves its controls alone", async () => {
+    Object.defineProperty(window, "__TAURI_INTERNALS__", { configurable: true, value: {} });
+    const gateways = createMockGateways();
+    setGatewaysForTests(gateways);
+    useAppStore.setState({ workspaceRoot: "/workspace", notes: [] });
+    const user = userEvent.setup();
+    const view = render(<NoteGraphView />);
+    const header = view.getByRole("heading", { name: "笔记图谱" }).closest("header");
+    expect(header).toHaveAttribute("data-tauri-drag-region", "");
+
+    await user.pointer({ keys: "[MouseLeft>]", target: view.getByRole("heading", { name: "笔记图谱" }) });
+    await user.pointer({ keys: "[/MouseLeft]" });
+    expect(startWindowDragging).toHaveBeenCalledOnce();
+
+    startWindowDragging.mockClear();
+    await user.click(view.getByRole("button", { name: "完整图谱" }));
+    await user.click(view.getByRole("switch", { name: "显示孤立笔记" }));
+    await user.click(view.getByText("显示孤立笔记"));
+    expect(startWindowDragging).not.toHaveBeenCalled();
   });
 });

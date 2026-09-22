@@ -19,7 +19,7 @@ export function createTauriSpeechGateway(): SpeechGateway {
     },
     installModel: (requestId, source, model = "small") => call<SpeechModelStatus>("install_speech_model", { requestId, source, model }),
     start: (requestId, model = "small") => call<void>("start_speech_recording", { requestId, model }),
-    stop: (requestId, language) => call<SpeechTranscript>("stop_speech_recording", { requestId, language }),
+    stop: (requestId, language, context) => call<SpeechTranscript>("stop_speech_recording", { requestId, language, context }),
     cancel: (requestId) => call<void>("cancel_speech", { requestId }),
     format: (settings, text) => call<string>("format_speech_transcript", { settings, text }),
     watchProgress: (onProgress) => listen<SpeechProgress>("speech-progress", (event) => onProgress(event.payload)),

@@ -49,6 +49,7 @@ impl SpeechService {
                 app_data
                     .join("speech-models")
                     .join(speech_model::spec(model).file),
+                model,
             ))
         });
         Self {
@@ -167,6 +168,7 @@ impl SpeechService {
         &self,
         id: &str,
         language: String,
+        context: String,
         report: impl Fn(u32) + Send + 'static,
     ) -> AppResult<SpeechTranscript> {
         let job = self
@@ -194,8 +196,13 @@ impl SpeechService {
             .recv()
             .map_err(|_| speech_error("microphoneError"))??;
         let samples = audio_capture::resample(audio, &job.cancelled)?;
-        self.recognizer(job.model)
-            .transcribe(samples, language, job.cancelled.clone(), report)
+        self.recognizer(job.model).transcribe(
+            samples,
+            language,
+            context,
+            job.cancelled.clone(),
+            report,
+        )
     }
 
     pub fn cancel(&self, id: &str) {

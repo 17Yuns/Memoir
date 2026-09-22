@@ -39,6 +39,7 @@ quick-xml = "0.37"
 percent-encoding = "2"
 cpal = "0.15.3"
 whisper-rs = "0.16"
+simplet2s = "0.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.16", features = ["metal"] }

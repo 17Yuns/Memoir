@@ -33,6 +33,16 @@ to that provider. Turn off **Clean up after transcription** for offline use.
    press Escape while focused inside it, to discard the session. The info button
    explains local transcription and optional cloud cleanup.
 
+Chinese transcripts use Simplified Chinese, including when automatic language
+detection identifies Chinese. Conversion runs locally before preview and AI cleanup,
+so it also works offline. Selecting Chinese explicitly additionally gives Whisper
+a Simplified Chinese prompt; automatic detection and other languages are not prompted
+in Chinese. Other detected languages keep their original writing system.
+AI cleanup preserves the transcript's writing system and may correct homophone or
+proper-name recognition errors only when the transcript provides strong context.
+Short or ambiguous phrases still need review; script conversion alone does not
+correct a misheard word.
+
 The browser demo reports that voice input requires the desktop app. No Python,
 external Whisper executable, or separate model server is needed by users.
 

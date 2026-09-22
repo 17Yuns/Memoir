@@ -131,7 +131,7 @@ export interface SpeechGateway {
   chooseModel(model?: SpeechModel): Promise<string | null>;
   installModel(requestId: string, source: string | null, model?: SpeechModel): Promise<SpeechModelStatus>;
   start(requestId: string, model?: SpeechModel): Promise<void>;
-  stop(requestId: string, language: SpeechLanguage): Promise<SpeechTranscript>;
+  stop(requestId: string, language: SpeechLanguage, context?: string): Promise<SpeechTranscript>;
   cancel(requestId: string): Promise<void>;
   format(settings: AiSettings, text: string): Promise<string>;
   watchProgress(onProgress: (progress: SpeechProgress) => void): Promise<() => void>;
